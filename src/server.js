@@ -41,26 +41,43 @@ app.use((req, res, next) => {
 });
 
 app.use(express.static(path.join(__dirname, '../public'), { maxAge: cfg.isProd ? '1h' : 0, index: false }));
+if (cfg.basePath) {
+  app.use(cfg.basePath, express.static(path.join(__dirname, '../public'), { maxAge: cfg.isProd ? '1h' : 0, index: false }));
+}
 
 app.get('/health', async (_req, res) => {
   try { await pool.query('SELECT 1'); res.json({ ok: true }); } catch (_) { res.status(503).json({ ok: false }); }
 });
 
-app.use('/api/auth', require('./routes/auth'));
-app.use('/api/public', require('./routes/public').api);
-app.use('/api', require('./routes/invitations'));
-app.use('/', require('./routes/pages'));
-app.use('/', require('./routes/public').pages); // /:slug harus terakhir
+const authRoutes = require('./routes/auth');
+const publicApiRoutes = require('./routes/public').api;
+const invitationsRoutes = require('./routes/invitations');
+const pagesRoutes = require('./routes/pages');
+const publicPagesRoutes = require('./routes/public').pages;
+
+app.use('/api/auth', authRoutes);
+app.use('/api/public', publicApiRoutes);
+app.use('/api', invitationsRoutes);
+app.use('/', pagesRoutes);
+app.use('/', publicPagesRoutes); // /:slug harus terakhir
+
+if (cfg.basePath) {
+  app.use(`${cfg.basePath}/api/auth`, authRoutes);
+  app.use(`${cfg.basePath}/api/public`, publicApiRoutes);
+  app.use(`${cfg.basePath}/api`, invitationsRoutes);
+  app.use(cfg.basePath, pagesRoutes);
+  app.use(cfg.basePath, publicPagesRoutes);
+}
 
 app.use((req, res) => {
-  if (req.path.startsWith('/api/')) return res.status(404).json({ error: 'Tidak ditemukan.' });
+  if (req.path.includes('/api/')) return res.status(404).json({ error: 'Tidak ditemukan.' });
   return res.status(404).render('notice', { title: 'Halaman tidak ditemukan', text: 'Alamat yang Anda tuju tidak ada atau belum dipublikasikan.' });
 });
 
 // eslint-disable-next-line no-unused-vars
 app.use((err, req, res, _next) => {
   console.error(`[error] ${req.method} ${req.originalUrl}:`, err);
-  if (req.path.startsWith('/api/')) return res.status(500).json({ error: 'Terjadi kesalahan pada server.' });
+  if (req.path.includes('/api/')) return res.status(500).json({ error: 'Terjadi kesalahan pada server.' });
   return res.status(500).render('notice', { title: 'Terjadi kesalahan', text: 'Silakan coba lagi beberapa saat lagi.' });
 });
 

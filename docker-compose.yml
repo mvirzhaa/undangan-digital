@@ -23,6 +23,7 @@ services:
       DATABASE_URL: postgres://${POSTGRES_USER:-undangan}:${POSTGRES_PASSWORD:-undanganuika2026}@db:5432/${POSTGRES_DB:-undangan_digital}
       JWT_SECRET: ${JWT_SECRET:-undangan-digital-jwt-secret-uika-2026-minimal-32-karakter}
       BASE_URL: ${BASE_URL:-https://utility.uika-bogor.ac.id/undangan-digital}
+      BASE_PATH: ${BASE_PATH:-/undangan-digital}
       NODE_ENV: production
     ports:
       - "3006:3006"
