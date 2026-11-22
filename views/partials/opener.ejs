@@ -1,0 +1,76 @@
+<%# Animasi pembuka undangan. Variabel: openerKey, c, guest, t, version, events %>
+<%
+  const dateLabel = events[0] && events[0].dateLabel ? events[0].dateLabel : '';
+  function card() { %>
+    <div class="op-card">
+      <small class="label"><%= c.cover.label %></small>
+      <% if (version && version.badge) { %><span class="vbadge"><%= version.badge %></span><% } %>
+      <div class="guest-box">
+        <span><%= t.dear %></span>
+        <strong><%= guest ? guest.name : t.guestFallback %></strong>
+      </div>
+      <button type="button" class="btn primary" id="open-btn"><%= c.cover.buttonText || t.open %></button>
+      <p class="op-hint"><%= t.openerHint %></p>
+    </div>
+<% } %>
+<div class="opener op-<%= openerKey %>" id="opener" role="dialog" aria-modal="true" aria-label="<%= c.cover.title %>">
+<% if (openerKey === 'envelope') { %>
+  <div class="op-stage">
+    <div class="env" aria-hidden="true">
+      <div class="env-back"></div>
+      <div class="env-letter"><small class="label"><%= c.cover.label %></small><strong><%= c.cover.title %></strong><% if (dateLabel) { %><em><%= dateLabel %></em><% } %></div>
+      <div class="env-front"></div>
+      <div class="env-flap"></div>
+      <div class="env-seal">✦</div>
+    </div>
+    <% card() %>
+  </div>
+<% } else if (openerKey === 'book') { %>
+  <div class="op-stage">
+    <div class="book" aria-hidden="true">
+      <div class="book-page"><div class="orn"></div><strong><%= c.cover.title %></strong><% if (dateLabel) { %><em><%= dateLabel %></em><% } %></div>
+      <div class="book-cover">
+        <div class="bc-front"><small class="label"><%= c.cover.label %></small><strong><%= c.cover.title %></strong><div class="orn"></div></div>
+        <div class="bc-back"></div>
+      </div>
+    </div>
+    <% card() %>
+  </div>
+<% } else if (openerKey === 'flip') { %>
+  <div class="op-stage">
+    <div class="flipcard" aria-hidden="true">
+      <div class="fc-face fc-front"><div class="fc-inner"><small class="label"><%= c.cover.label %></small><strong><%= c.cover.title %></strong><div class="orn"></div><% if (dateLabel) { %><em><%= dateLabel %></em><% } %></div></div>
+      <div class="fc-face fc-back"><div class="fc-inner"><div class="orn"></div><strong><%= c.cover.title %></strong></div></div>
+    </div>
+    <% card() %>
+  </div>
+<% } else if (openerKey === 'doors') { %>
+  <div class="doors" aria-hidden="true">
+    <div class="door l"><span class="panel"></span><span class="knob"></span></div>
+    <div class="door r"><span class="panel"></span><span class="knob"></span></div>
+  </div>
+  <div class="op-stage">
+    <div class="op-title" aria-hidden="true"><strong><%= c.cover.title %></strong></div>
+    <% card() %>
+  </div>
+<% } else if (openerKey === 'curtain') { %>
+  <div class="curtain l" aria-hidden="true"></div>
+  <div class="curtain r" aria-hidden="true"></div>
+  <div class="valance" aria-hidden="true"></div>
+  <div class="op-stage">
+    <div class="op-title" aria-hidden="true"><strong><%= c.cover.title %></strong></div>
+    <% card() %>
+  </div>
+<% } else if (openerKey === 'iris') { %>
+  <div class="op-stage">
+    <div class="op-title" aria-hidden="true"><div class="orn"></div><strong><%= c.cover.title %></strong><% if (dateLabel) { %><em><%= dateLabel %></em><% } %></div>
+    <% card() %>
+  </div>
+<% } else if (openerKey === 'shutter') { %>
+  <div class="blinds" aria-hidden="true"><% for (let i = 0; i < 8; i++) { %><i style="--i:<%= i %>"></i><% } %></div>
+  <div class="op-stage">
+    <div class="op-title" aria-hidden="true"><strong><%= c.cover.title %></strong></div>
+    <% card() %>
+  </div>
+<% } %>
+</div>

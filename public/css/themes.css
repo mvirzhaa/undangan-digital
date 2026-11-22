@@ -13,10 +13,10 @@
 .theme-ivory-minimal .guest-box { border-radius: 2px; }
 .theme-ivory-minimal h1, .theme-ivory-minimal h2 { font-weight: 500; letter-spacing: .03em; }
 
-/* Sage Floral — hijau lembut, hiasan daun pada judul */
-.theme-sage-floral h2::before, .theme-sage-floral h2::after { content: '❦'; color: var(--accent); font-size: .8em; margin: 0 .5em; }
-.theme-sage-floral .host-photo { border-radius: 50%; width: 210px; height: 210px; }
-.theme-sage-floral .cover { background: linear-gradient(rgba(35,60,40,.35), rgba(35,60,40,.6)), var(--cover-img, none) center/cover, linear-gradient(160deg, var(--primary), #8fae8b); }
+/* Sage Garden — hijau lembut, hiasan daun pada judul */
+.theme-sage-garden h2::before, .theme-sage-garden h2::after { content: '❦'; color: var(--accent); font-size: .8em; margin: 0 .5em; }
+.theme-sage-garden .host-photo { border-radius: 50%; width: 210px; height: 210px; }
+.theme-sage-garden .cover { background: linear-gradient(rgba(35,60,40,.35), rgba(35,60,40,.6)), var(--cover-img, none) center/cover, linear-gradient(160deg, var(--primary), #8fae8b); }
 
 /* Noir Gold — gelap, garis emas (cocok untuk gala) */
 .theme-noir-gold { --on-primary: #1a1405; --radius: 2px; }
@@ -48,13 +48,13 @@
 .theme-confetti-pop .countdown div { transform: rotate(-2deg); } .theme-confetti-pop .countdown div:nth-child(even) { transform: rotate(2deg); background: var(--accent); color: var(--text); }
 .theme-confetti-pop .host-photo { border-radius: 50%; width: 200px; height: 200px; border: 5px solid var(--accent); }
 
-/* Midnight Royal — biru malam & emas */
-.theme-midnight-royal { --on-primary: #101a38; }
-.theme-midnight-royal .cover { background: linear-gradient(rgba(10,18,50,.5), rgba(10,18,50,.85)), var(--cover-img, none) center/cover, radial-gradient(ellipse at 50% 0%, #2c3f8a, #0f1b3d 70%); }
-.theme-midnight-royal .sec:nth-of-type(even) { background: #14235a; }
-.theme-midnight-royal .card, .theme-midnight-royal .event-card { background: rgba(255,255,255,.05); border-color: color-mix(in srgb, var(--primary) 35%, transparent); }
-.theme-midnight-royal .cover .btn.primary { background: var(--primary); color: #101a38; border-color: var(--primary); }
-.theme-midnight-royal .orn { color: var(--primary); }
+/* Royal Book — biru malam & emas */
+.theme-royal-book { --on-primary: #101a38; }
+.theme-royal-book .cover { background: linear-gradient(rgba(10,18,50,.5), rgba(10,18,50,.85)), var(--cover-img, none) center/cover, radial-gradient(ellipse at 50% 0%, #2c3f8a, #0f1b3d 70%); }
+.theme-royal-book .sec:nth-of-type(even) { background: #14235a; }
+.theme-royal-book .card, .theme-royal-book .event-card { background: rgba(255,255,255,.05); border-color: color-mix(in srgb, var(--primary) 35%, transparent); }
+.theme-royal-book .cover .btn.primary { background: var(--primary); color: #101a38; border-color: var(--primary); }
+.theme-royal-book .orn { color: var(--primary); }
 
 /* Terracotta Boho — hangat, lengkungan */
 .theme-terracotta-boho h1, .theme-terracotta-boho h2 { font-weight: 600; }
@@ -71,3 +71,31 @@
 .theme-neon-night .btn.primary { box-shadow: 0 0 18px color-mix(in srgb, var(--primary) 60%, transparent); }
 .theme-neon-night .countdown div { background: transparent; border: 1px solid var(--accent); color: var(--accent); box-shadow: inset 0 0 14px color-mix(in srgb, var(--accent) 25%, transparent); }
 .theme-neon-night .cover .btn.primary { background: var(--primary); color: #12062a; border-color: var(--primary); }
+
+/* Velvet Night — beludru marun & emas (gala) */
+.theme-velvet-night { --on-primary: #2a1305; --radius: 4px; }
+.theme-velvet-night h1, .theme-velvet-night h2 { letter-spacing: .04em; }
+.theme-velvet-night .cover { background: linear-gradient(rgba(29,11,18,.45), rgba(29,11,18,.88)), var(--cover-img, none) center/cover, radial-gradient(ellipse at 50% 0%, #6b1a2e, #1d0b12 70%); }
+.theme-velvet-night .sec:nth-of-type(even) { background: #2a1019; }
+.theme-velvet-night .card, .theme-velvet-night .event-card { background: rgba(255,255,255,.04); border-color: color-mix(in srgb, var(--primary) 45%, transparent); }
+.theme-velvet-night .btn { letter-spacing: .14em; text-transform: uppercase; font-size: .76rem; }
+.theme-velvet-night .cover .btn.primary { background: var(--primary); color: #2a1305; border-color: var(--primary); }
+.theme-velvet-night .countdown div { background: transparent; border: 1px solid var(--primary); color: var(--primary); border-radius: 2px; }
+.theme-velvet-night .orn { color: var(--primary); }
+
+/* Corporate Slate — rapi & profesional */
+.theme-corporate-slate { --radius: 10px; }
+.theme-corporate-slate h1, .theme-corporate-slate h2 { letter-spacing: -.01em; font-weight: 700; }
+.theme-corporate-slate .cover { background: linear-gradient(rgba(10,25,60,.45), rgba(10,25,60,.78)), var(--cover-img, none) center/cover, linear-gradient(150deg, #123a85, #1f6feb 60%, #6aa4f5); }
+.theme-corporate-slate .event-card, .theme-corporate-slate .card { box-shadow: 0 2px 10px rgba(23,32,54,.08); }
+.theme-corporate-slate .btn { border-radius: 8px; }
+.theme-corporate-slate .countdown div { border-radius: 8px; }
+.theme-corporate-slate .host-photo { border-radius: 14px; border: 0; }
+
+/* Sunny Fest — hangat & ramah */
+.theme-sunny-fest { --radius: 22px; }
+.theme-sunny-fest .cover { background: linear-gradient(rgba(90,40,5,.2), rgba(90,40,5,.55)), var(--cover-img, none) center/cover, linear-gradient(160deg, var(--primary), #ffb347); }
+.theme-sunny-fest .event-card, .theme-sunny-fest .card { border-width: 2px; border-color: var(--accent); }
+.theme-sunny-fest .btn.primary { box-shadow: 0 4px 0 color-mix(in srgb, var(--primary) 65%, #000); }
+.theme-sunny-fest .host-photo { border-radius: 50%; width: 200px; height: 200px; }
+.theme-sunny-fest .countdown div:nth-child(even) { background: var(--accent); color: var(--text); }

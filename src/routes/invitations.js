@@ -8,9 +8,11 @@ const QRCode = require('qrcode');
 const { query } = require('../db');
 const cfg = require('../config');
 const { requireAuth } = require('../auth');
-const { EVENT_TYPES, THEMES, PALETTES, FONTS, THEME_KEYS, getTheme } = require('../lib/themes');
+const { EVENT_TYPES, THEMES, PALETTES, FONTS, OPENERS, EFFECTS, AR_RUM_21, getTheme, resolveThemeKey } = require('../lib/themes');
 const { defaultsFor } = require('../lib/defaults');
 const S = require('../lib/sanitize');
+const { cleanVersions } = require('../lib/versions');
+const X = require('../lib/excel');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -37,7 +39,7 @@ async function uniqueSlug(base) {
 
 // ---------- meta ----------
 router.get('/meta', (_req, res) => {
-  res.json({ eventTypes: EVENT_TYPES, themes: THEMES, palettes: PALETTES, fonts: FONTS });
+  res.json({ eventTypes: EVENT_TYPES, themes: THEMES, openers: OPENERS, effects: EFFECTS, arRum21: AR_RUM_21, palettes: PALETTES, fonts: FONTS });
 });
 
 router.get('/slug-check', async (req, res) => {
@@ -111,7 +113,10 @@ router.get('/invitations/:id', (req, res) => res.json({ invitation: req.inv }));
 router.put('/invitations/:id', async (req, res) => {
   const inv = req.inv;
   const b = req.body || {};
-  const theme = THEME_KEYS.includes(b.theme) ? b.theme : inv.theme;
+  // Template hanya boleh yang cocok dengan jenis acara (template yang sudah dipakai tetap diizinkan).
+  const wanted = resolveThemeKey(b.theme);
+  const wantedDef = THEMES.find((t) => t.key === wanted);
+  const theme = wantedDef && (wantedDef.types.includes(inv.event_type) || wanted === inv.theme) ? wanted : inv.theme;
   const base = getTheme(theme);
 
   const next = {
@@ -122,6 +127,7 @@ router.put('/invitations/:id', async (req, res) => {
     fonts: b.fonts ? S.cleanFonts(b.fonts, base.fonts) : inv.fonts,
     content: b.content ? S.cleanContent(b.content) : inv.content,
     settings: b.settings ? S.cleanSettings(b.settings) : inv.settings,
+    versions: b.versions ? cleanVersions(b.versions, inv.event_type) : inv.versions,
     status: b.status === 'published' || b.status === 'draft' ? b.status : inv.status,
   };
 
@@ -135,8 +141,13 @@ router.put('/invitations/:id', async (req, res) => {
   try {
     const r = await query(
       `UPDATE invitations SET title=$1, slug=$2, theme=$3, colors=$4, fonts=$5, content=$6, settings=$7,
-              status=$8, updated_at=now() WHERE id=$9 RETURNING *`,
-      [next.title, next.slug, next.theme, next.colors, next.fonts, next.content, next.settings, next.status, inv.id],
+              status=$8, versions=$9, updated_at=now() WHERE id=$10 RETURNING *`,
+      [next.title, next.slug, next.theme, next.colors, next.fonts, next.content, next.settings, next.status, JSON.stringify(next.versions), inv.id],
+    );
+    // Tamu yang versinya sudah dihapus kembali memakai versi standar.
+    await query(
+      `UPDATE guests SET version_id = '' WHERE invitation_id = $1 AND version_id <> '' AND NOT (version_id = ANY($2::text[]))`,
+      [inv.id, next.versions.map((v) => v.id)],
     );
     res.json({ invitation: r.rows[0] });
   } catch (err) {
@@ -157,9 +168,9 @@ router.post('/invitations/:id/duplicate', async (req, res) => {
   if (count.rows[0].n >= MAX_INVITATIONS) return res.status(400).json({ error: 'Batas jumlah undangan tercapai.' });
   const slug = await uniqueSlug(`${inv.slug}-salinan`);
   const r = await query(
-    `INSERT INTO invitations (user_id, slug, title, event_type, theme, colors, fonts, content, settings, status)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'draft') RETURNING id, slug`,
-    [inv.user_id, slug, `${inv.title} (salinan)`.slice(0, 200), inv.event_type, inv.theme, inv.colors, inv.fonts, inv.content, inv.settings],
+    `INSERT INTO invitations (user_id, slug, title, event_type, theme, colors, fonts, content, settings, versions, status)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'draft') RETURNING id, slug`,
+    [inv.user_id, slug, `${inv.title} (salinan)`.slice(0, 200), inv.event_type, inv.theme, inv.colors, inv.fonts, inv.content, inv.settings, JSON.stringify(inv.versions || [])],
   );
   res.status(201).json(r.rows[0]);
 });
@@ -238,7 +249,8 @@ router.get('/invitations/:id/stats', async (req, res) => {
 
 // ---------- tamu ----------
 const KINDS = ['individual', 'group', 'private'];
-function cleanGuest(b) {
+function cleanGuest(b, inv) {
+  const vid = S.str(b.version_id, 30);
   return {
     name: S.str(b.name, 160).trim(),
     group_name: S.str(b.group_name, 80).trim(),
@@ -246,6 +258,7 @@ function cleanGuest(b) {
     pax_limit: S.int(b.pax_limit, 1, 50, 1),
     kind: KINDS.includes(b.kind) ? b.kind : 'individual',
     table_name: S.str(b.table_name, 60).trim(),
+    version_id: (inv.versions || []).some((v) => v.id === vid) ? vid : '',
   };
 }
 
@@ -253,9 +266,9 @@ async function insertGuest(invId, g) {
   for (let i = 0; i < 5; i += 1) {
     try {
       const r = await query(
-        `INSERT INTO guests (invitation_id, name, code, group_name, phone, pax_limit, kind, table_name)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
-        [invId, g.name, randomCode(), g.group_name, g.phone, g.pax_limit, g.kind, g.table_name],
+        `INSERT INTO guests (invitation_id, name, code, group_name, phone, pax_limit, kind, table_name, version_id)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
+        [invId, g.name, randomCode(), g.group_name, g.phone, g.pax_limit, g.kind, g.table_name, g.version_id],
       );
       return r.rows[0];
     } catch (err) {
@@ -280,40 +293,103 @@ async function guestCount(invId) {
 }
 
 router.post('/invitations/:id/guests', async (req, res) => {
-  const g = cleanGuest(req.body || {});
+  const g = cleanGuest(req.body || {}, req.inv);
   if (!g.name) return res.status(400).json({ error: 'Nama tamu wajib diisi.' });
   if ((await guestCount(req.inv.id)) >= MAX_GUESTS) return res.status(400).json({ error: 'Batas jumlah tamu tercapai.' });
   res.status(201).json({ guest: await insertGuest(req.inv.id, g) });
 });
 
-// Impor: satu baris per tamu. Format: nama, grup, telepon, jumlah (pemisah koma/titik koma/tab).
-router.post('/invitations/:id/guests/import', async (req, res) => {
-  const text = S.str(req.body.text, 400000);
-  const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
-  if (!lines.length) return res.status(400).json({ error: 'Data impor kosong.' });
-  if (lines.length > 500) return res.status(400).json({ error: 'Maksimal 500 baris per impor.' });
-
-  let existing = await guestCount(req.inv.id);
-  const added = [];
-  let skipped = 0;
-  for (let i = 0; i < lines.length; i += 1) {
-    const cells = lines[i].split(/[;\t,]/).map((c) => c.trim().replace(/^"|"$/g, ''));
-    if (i === 0 && /^(nama|name)$/i.test(cells[0])) continue;
-    if (!cells[0] || existing >= MAX_GUESTS) { skipped += 1; continue; }
-    const g = cleanGuest({ name: cells[0], group_name: cells[1], phone: cells[2], pax_limit: cells[3] });
-    added.push(await insertGuest(req.inv.id, g));
-    existing += 1;
+// Aksi massal: ganti versi undangan atau hapus beberapa tamu sekaligus.
+router.post('/invitations/:id/guests/bulk', async (req, res) => {
+  const ids = S.arr(req.body.ids, MAX_GUESTS).map((n) => parseInt(n, 10)).filter(Number.isInteger);
+  if (!ids.length) return res.status(400).json({ error: 'Pilih minimal satu tamu.' });
+  if (req.body.action === 'delete') {
+    const r = await query('DELETE FROM guests WHERE invitation_id = $1 AND id = ANY($2::int[])', [req.inv.id, ids]);
+    return res.json({ affected: r.rowCount });
   }
-  res.json({ added: added.length, skipped });
+  if (req.body.action === 'version') {
+    const vid = S.str(req.body.version_id, 30);
+    if (vid && !(req.inv.versions || []).some((v) => v.id === vid)) return res.status(400).json({ error: 'Versi tidak ditemukan.' });
+    const r = await query('UPDATE guests SET version_id = $1 WHERE invitation_id = $2 AND id = ANY($3::int[])', [vid, req.inv.id, ids]);
+    return res.json({ affected: r.rowCount });
+  }
+  return res.status(400).json({ error: 'Aksi tidak dikenal.' });
+});
+
+// ---------- Excel: template, impor, ekspor ----------
+const xlsxUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: X.MAX_FILE, files: 1 } });
+
+function sendXlsx(res, filename, buf) {
+  res.set('Content-Type', X.XLSX_MIME);
+  res.set('Content-Disposition', `attachment; filename="${filename}"`);
+  res.set('Cache-Control', 'no-store');
+  res.send(buf);
+}
+
+router.get('/invitations/:id/guests/template.xlsx', async (req, res) => {
+  const buf = await X.buildGuestsWorkbook({ guests: [], versions: req.inv.versions || [], baseUrl: cfg.baseUrl, slug: req.inv.slug, withData: false });
+  sendXlsx(res, 'template-tamu.xlsx', buf);
+});
+
+router.get('/invitations/:id/export/guests.xlsx', async (req, res) => {
+  const r = await query(
+    `SELECT g.*, r.attendance FROM guests g LEFT JOIN rsvps r ON r.guest_id = g.id
+      WHERE g.invitation_id = $1 ORDER BY g.id`, [req.inv.id],
+  );
+  const buf = await X.buildGuestsWorkbook({ guests: r.rows, versions: req.inv.versions || [], baseUrl: cfg.baseUrl, slug: req.inv.slug });
+  sendXlsx(res, 'daftar-tamu.xlsx', buf);
+});
+
+router.get('/invitations/:id/export/rsvps.xlsx', async (req, res) => {
+  const r = await query('SELECT * FROM rsvps WHERE invitation_id = $1 ORDER BY id', [req.inv.id]);
+  sendXlsx(res, 'rsvp.xlsx', await X.buildRsvpWorkbook(r.rows));
+});
+
+// Impor: baris dengan Kode yang sudah ada diperbarui, selain itu ditambahkan sebagai tamu baru.
+router.post('/invitations/:id/guests/import', (req, res, next) => {
+  xlsxUpload.single('file')(req, res, async (err) => {
+    try {
+      if (err) return res.status(400).json({ error: err.code === 'LIMIT_FILE_SIZE' ? 'Ukuran berkas maksimal 2 MB.' : err.message });
+      if (!req.file) return res.status(400).json({ error: 'Pilih berkas Excel (.xlsx) terlebih dahulu.' });
+      let parsed;
+      try { parsed = await X.parseGuestsXlsx(req.file.buffer, req.inv.versions || []); } catch (e) { return res.status(400).json({ error: e.message }); }
+      if (!parsed.rows.length && !parsed.errors.length) return res.status(400).json({ error: 'Tidak ada data tamu pada berkas.' });
+
+      const existingCodes = new Map(
+        (await query('SELECT id, code FROM guests WHERE invitation_id = $1', [req.inv.id])).rows.map((g) => [g.code, g.id]),
+      );
+      let total = existingCodes.size;
+      let added = 0; let updated = 0;
+      const errors = parsed.errors.slice();
+      for (const row of parsed.rows) {
+        const g = cleanGuest(row, req.inv);
+        const gid = row.code && existingCodes.get(row.code);
+        if (gid) {
+          await query(
+            `UPDATE guests SET name=$1, group_name=$2, phone=$3, pax_limit=$4, kind=$5, table_name=$6, version_id=$7
+              WHERE id=$8 AND invitation_id=$9`,
+            [g.name, g.group_name, g.phone, g.pax_limit, g.kind, g.table_name, g.version_id, gid, req.inv.id],
+          );
+          updated += 1;
+        } else if (total >= MAX_GUESTS) {
+          errors.push({ row: row.row, message: `Batas ${MAX_GUESTS} tamu tercapai` });
+        } else {
+          await insertGuest(req.inv.id, g);
+          total += 1; added += 1;
+        }
+      }
+      return res.json({ added, updated, skipped: errors.length, errors: errors.slice(0, 30) });
+    } catch (e) { return next(e); }
+  });
 });
 
 router.put('/invitations/:id/guests/:gid', async (req, res) => {
-  const g = cleanGuest(req.body || {});
+  const g = cleanGuest(req.body || {}, req.inv);
   if (!g.name) return res.status(400).json({ error: 'Nama tamu wajib diisi.' });
   const r = await query(
-    `UPDATE guests SET name=$1, group_name=$2, phone=$3, pax_limit=$4, kind=$5, table_name=$6
-      WHERE id=$7 AND invitation_id=$8 RETURNING *`,
-    [g.name, g.group_name, g.phone, g.pax_limit, g.kind, g.table_name, req.params.gid, req.inv.id],
+    `UPDATE guests SET name=$1, group_name=$2, phone=$3, pax_limit=$4, kind=$5, table_name=$6, version_id=$7
+      WHERE id=$8 AND invitation_id=$9 RETURNING *`,
+    [g.name, g.group_name, g.phone, g.pax_limit, g.kind, g.table_name, g.version_id, req.params.gid, req.inv.id],
   );
   if (!r.rowCount) return res.status(404).json({ error: 'Tamu tidak ditemukan.' });
   res.json({ guest: r.rows[0] });
@@ -384,30 +460,6 @@ router.patch('/invitations/:id/wishes/:wid', async (req, res) => {
 router.delete('/invitations/:id/wishes/:wid', async (req, res) => {
   await query('DELETE FROM wishes WHERE id = $1 AND invitation_id = $2', [req.params.wid, req.inv.id]);
   res.json({ ok: true });
-});
-
-// ---------- ekspor CSV ----------
-const csvCell = (v) => {
-  let s = v === null || v === undefined ? '' : String(v);
-  if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`; // cegah injeksi rumus spreadsheet
-  return `"${s.replace(/"/g, '""')}"`;
-};
-const toCsv = (rows) => rows.map((r) => r.map(csvCell).join(',')).join('\r\n');
-
-router.get('/invitations/:id/export/guests.csv', async (req, res) => {
-  const r = await query('SELECT * FROM guests WHERE invitation_id = $1 ORDER BY id', [req.inv.id]);
-  const rows = [['Nama', 'Grup', 'Telepon', 'Jumlah', 'Jenis', 'Meja', 'Link']].concat(
-    r.rows.map((g) => [g.name, g.group_name, g.phone, g.pax_limit, g.kind, g.table_name, `${cfg.baseUrl}/${req.inv.slug}?to=${g.code}`]),
-  );
-  res.type('text/csv').attachment('tamu.csv').send(`﻿${toCsv(rows)}`);
-});
-
-router.get('/invitations/:id/export/rsvps.csv', async (req, res) => {
-  const r = await query('SELECT * FROM rsvps WHERE invitation_id = $1 ORDER BY id', [req.inv.id]);
-  const rows = [['Nama', 'Kehadiran', 'Jumlah', 'Menu', 'Catatan', 'Waktu']].concat(
-    r.rows.map((x) => [x.name, x.attendance, x.pax, x.menu, x.note, x.created_at.toISOString()]),
-  );
-  res.type('text/csv').attachment('rsvp.csv').send(`﻿${toCsv(rows)}`);
 });
 
 module.exports = router;

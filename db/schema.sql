@@ -67,3 +67,11 @@ CREATE TABLE IF NOT EXISTS wishes (
   created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_wishes_invitation ON wishes(invitation_id);
+
+-- ---- v2: versi undangan per tipe tamu (VIP / reguler, dst.) ----
+ALTER TABLE invitations ADD COLUMN IF NOT EXISTS versions JSONB NOT NULL DEFAULT '[]'::jsonb;
+ALTER TABLE guests ADD COLUMN IF NOT EXISTS version_id VARCHAR(30) NOT NULL DEFAULT '';
+
+-- Nama template lama -> baru (aman dijalankan berulang)
+UPDATE invitations SET theme = 'sage-garden' WHERE theme = 'sage-floral';
+UPDATE invitations SET theme = 'royal-book' WHERE theme = 'midnight-royal';

@@ -13,12 +13,23 @@
   <% if (ogImage) { %><meta property="og:image" content="<%= ogImage %>"><% } %>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <meta name="base-path" content="<%= basePath %>">
   <link rel="stylesheet" href="<%= fontsUrl %>">
   <link rel="stylesheet" href="<%= basePath %>/css/invitation.css">
   <link rel="stylesheet" href="<%= basePath %>/css/themes.css">
+  <link rel="stylesheet" href="<%= basePath %>/css/openers.css">
 </head>
-<body class="inv theme-<%= inv.theme %> type-<%= inv.event_type %> locked" style="<%= cssVars %>">
+<body class="inv theme-<%= inv.theme %> type-<%= inv.event_type %><%= openerKey ? ' has-opener opener-' + openerKey : '' %><%= fxKey ? ' fx-on' : '' %> locked" style="<%= cssVars %>">
 <% const eventsWithDate = events; %>
+<% const showAmp = c.hosts.length === 2 && (inv.event_type === 'wedding' || inv.event_type === 'engagement'); %>
+
+<% if (fxKey) { %>
+<div class="fx fx-<%= fxKey %>" aria-hidden="true">
+  <% fx.forEach(function (p) { %><i class="t<%= p.tone %>" style="left:<%= p.left %>%;top:<%= p.top %>%;--d:<%= p.delay %>s;--t:<%= p.dur %>s;--s:<%= p.size %>px;--x:<%= p.drift %>px"></i><% }) %>
+</div>
+<% } %>
+
+<% if (openerKey) { %><%- include('partials/opener', { openerKey, c, guest, t, version, events }) %><% } %>
 
 <div class="stage">
   <aside class="stage-hero" aria-hidden="true">
@@ -41,21 +52,31 @@
         <% if (c.cover.subtitle) { %><p class="sub"><%= c.cover.subtitle %></p><% } %>
         <div class="orn" aria-hidden="true"></div>
         <% if (eventsWithDate[0] && eventsWithDate[0].dateLabel) { %><p class="cover-date"><%= eventsWithDate[0].dateLabel %></p><% } %>
+        <% if (!openerKey) { %>
+        <% if (version && version.badge) { %><span class="vbadge"><%= version.badge %></span><% } %>
         <div class="guest-box">
           <span><%= t.dear %></span>
           <strong><%= guest ? guest.name : t.guestFallback %></strong>
         </div>
         <button type="button" class="btn primary" id="open-btn"><%= c.cover.buttonText || t.open %></button>
+        <% } else { %>
+        <% if (version && version.badge) { %><span class="vbadge"><%= version.badge %></span><% } %>
+        <div class="guest-box inline">
+          <span><%= t.dear %></span>
+          <strong><%= guest ? guest.name : t.guestFallback %></strong>
+        </div>
+        <% } %>
       </div>
       <span class="scroll-hint"><%= t.scroll %></span>
     </section>
 
     <!-- PEMBUKA -->
-    <% if (c.opening.text) { %>
+    <% if (opening.show) { %>
     <section class="sec opening" id="opening">
       <div class="reveal">
         <div class="orn" aria-hidden="true"></div>
-        <p class="quote"><%= c.opening.text %></p>
+        <% if (opening.arabicOn) { %><p class="arabic" lang="ar" dir="rtl"><%= c.opening.arabic %></p><% } %>
+        <% if (opening.textOn) { %><p class="quote<%= opening.arabicOn ? ' trans' : '' %>"><%= c.opening.text %></p><% } %>
         <% if (c.opening.source) { %><p class="quote-src"><%= c.opening.source %></p><% } %>
       </div>
     </section>
@@ -65,18 +86,28 @@
     <% if (c.hosts.length) { %>
     <section class="sec hosts" id="hosts">
       <h2 class="reveal"><%= c.hostsHeading %></h2>
-      <div class="host-list">
+      <div class="host-list hosts-<%= c.hosts.length %>">
         <% c.hosts.forEach(function (h, i) { %>
           <article class="host reveal">
-            <% if (h.photo) { %><img class="host-photo" src="<%= mediaUrl(h.photo) %>" alt="<%= h.name %>" loading="lazy"><% } %>
+            <% if (h.photo) { %><img class="host-photo" src="<%= h.photo %>" alt="<%= h.name %>" loading="lazy"><% } %>
             <small class="label"><%= h.role %></small>
             <h3><%= h.name %><% if (h.title) { %><span class="title">, <%= h.title %></span><% } %></h3>
             <% if (h.parents) { %><p class="muted"><%= h.parents %></p><% } %>
             <% if (h.bio) { %><p class="bio"><%= h.bio %></p><% } %>
             <% if (h.instagram) { %><a class="ig" href="https://instagram.com/<%= h.instagram %>" target="_blank" rel="noopener noreferrer">@<%= h.instagram %></a><% } %>
           </article>
-          <% if (c.hosts.length === 2 && i === 0) { %><div class="amp reveal" aria-hidden="true">&amp;</div><% } %>
+          <% if (showAmp && i === 0) { %><div class="amp reveal" aria-hidden="true">&amp;</div><% } %>
         <% }) %>
+      </div>
+    </section>
+    <% } %>
+
+    <!-- TURUT MENGUNDANG -->
+    <% if (sections.family) { %>
+    <section class="sec family" id="family">
+      <div class="reveal">
+        <h2><%= c.family.heading || t.family %></h2>
+        <p class="family-text"><%= c.family.text %></p>
       </div>
     </section>
     <% } %>
@@ -114,6 +145,46 @@
     </section>
     <% } %>
 
+    <!-- CATATAN KHUSUS VERSI -->
+    <% if (versionNote) { %>
+    <section class="sec vnote" id="vnote">
+      <div class="reveal card vnote-card">
+        <% if (version.badge) { %><span class="vbadge dark"><%= version.badge %></span><% } %>
+        <h3><%= versionNote.title || t.info %></h3>
+        <p><%= versionNote.text %></p>
+      </div>
+    </section>
+    <% } %>
+
+    <!-- RANGKAIAN ACARA -->
+    <% if (sections.program) { %>
+    <section class="sec program" id="program">
+      <h2 class="reveal"><%= c.program.heading || t.program %></h2>
+      <ol class="rundown">
+        <% c.program.items.forEach(function (it) { %>
+          <li class="reveal"><time><%= it.time %></time><div><h3><%= it.title %></h3><% if (it.text) { %><p><%= it.text %></p><% } %></div></li>
+        <% }) %>
+      </ol>
+    </section>
+    <% } %>
+
+    <!-- PENGISI ACARA -->
+    <% if (sections.lineup) { %>
+    <section class="sec lineup" id="lineup">
+      <h2 class="reveal"><%= c.lineup.heading || t.lineup %></h2>
+      <div class="lineup-grid">
+        <% c.lineup.items.forEach(function (it) { %>
+          <article class="lineup-item reveal">
+            <% if (it.photo) { %><img src="<%= it.photo %>" alt="<%= it.name %>" loading="lazy"><% } else { %><span class="ph" aria-hidden="true"><%= (it.name || '?').charAt(0) %></span><% } %>
+            <h3><%= it.name %></h3>
+            <% if (it.role) { %><small class="label"><%= it.role %></small><% } %>
+            <% if (it.text) { %><p><%= it.text %></p><% } %>
+          </article>
+        <% }) %>
+      </div>
+    </section>
+    <% } %>
+
     <!-- CERITA -->
     <% if (sections.story) { %>
     <section class="sec story" id="story">
@@ -132,7 +203,7 @@
       <h2 class="reveal"><%= t.gallery %></h2>
       <div class="grid reveal">
         <% c.gallery.forEach(function (g, i) { %>
-          <button type="button" class="thumb" data-lightbox="<%= mediaUrl(g) %>"><img src="<%= mediaUrl(g) %>" alt="<%= t.gallery %> <%= i + 1 %>" loading="lazy"></button>
+          <button type="button" class="thumb" data-lightbox="<%= g %>"><img src="<%= g %>" alt="<%= t.gallery %> <%= i + 1 %>" loading="lazy"></button>
         <% }) %>
       </div>
     </section>
@@ -147,6 +218,18 @@
         <% if (c.dresscode.colors.length) { %>
           <div class="swatches"><% c.dresscode.colors.forEach(function (col) { %><span style="background:<%= col %>" title="<%= col %>"></span><% }) %></div>
         <% } %>
+      </div>
+    </section>
+    <% } %>
+
+    <!-- INFO PENTING -->
+    <% if (sections.info) { %>
+    <section class="sec info" id="info">
+      <h2 class="reveal"><%= c.info.heading || t.info %></h2>
+      <div class="info-list">
+        <% c.info.items.forEach(function (it) { %>
+          <div class="card info-item reveal"><h3><%= it.title %></h3><p><%= it.text %></p></div>
+        <% }) %>
       </div>
     </section>
     <% } %>
@@ -203,7 +286,7 @@
           <div class="acc-no"><%= a.number %></div>
           <% if (a.name) { %><small>a.n. <%= a.name %></small><% } %>
           <button type="button" class="btn ghost small" data-copy="<%= a.number %>"><%= t.copy %></button>
-          <% if (a.qris) { %><img class="qris" src="<%= mediaUrl(a.qris) %>" alt="QRIS <%= a.bank %>" loading="lazy"><% } %>
+          <% if (a.qris) { %><img class="qris" src="<%= a.qris %>" alt="QRIS <%= a.bank %>" loading="lazy"><% } %>
         </div>
       <% }) %>
       <% if (c.gifts.address) { %>
@@ -214,6 +297,20 @@
           <button type="button" class="btn ghost small" data-copy="<%= c.gifts.address %>"><%= t.copy %></button>
         </div>
       <% } %>
+    </section>
+    <% } %>
+
+    <!-- SPONSOR / MITRA -->
+    <% if (sections.partners) { %>
+    <section class="sec partners" id="partners">
+      <h2 class="reveal"><%= c.partners.heading || t.partners %></h2>
+      <div class="partner-row reveal">
+        <% c.partners.items.forEach(function (it) { %>
+          <% if (it.url) { %><a href="<%= it.url %>" target="_blank" rel="noopener noreferrer"><% } else { %><span><% } %>
+            <% if (it.logo) { %><img src="<%= it.logo %>" alt="<%= it.name %>" loading="lazy"><% } else { %><b><%= it.name %></b><% } %>
+          <% if (it.url) { %></a><% } else { %></span><% } %>
+        <% }) %>
+      </div>
     </section>
     <% } %>
 
@@ -248,6 +345,7 @@
     <nav class="bottom-nav" id="bottom-nav" aria-label="Navigasi">
       <% if (c.hosts.length) { %><a href="#hosts"><%= t.nav_hosts %></a><% } %>
       <% if (eventsWithDate.length) { %><a href="#events"><%= t.nav_events %></a><% } %>
+      <% if (sections.program) { %><a href="#program"><%= t.nav_program %></a><% } %>
       <% if (sections.rsvp) { %><a href="#rsvp"><%= t.nav_rsvp %></a><% } %>
       <% if (sections.wishes) { %><a href="#wishes"><%= t.nav_wishes %></a><% } %>
     </nav>
@@ -255,7 +353,7 @@
 </div>
 
 <% if (c.music.url) { %>
-  <audio id="bgm" src="<%= mediaUrl(c.music.url) %>" loop preload="none"></audio>
+  <audio id="bgm" src="<%= c.music.url %>" loop preload="none"></audio>
   <button type="button" class="music-btn" id="music-btn" aria-label="Musik" title="<%= c.music.title || 'Musik' %>">♪</button>
 <% } %>
 

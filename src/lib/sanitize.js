@@ -1,6 +1,6 @@
 // Validasi & pembersihan semua data yang dikirim dari editor sebelum disimpan.
 // Tujuan: hanya struktur yang dikenal yang tersimpan, dan URL hanya http(s)/upload lokal.
-const { THEME_KEYS, FONTS } = require('./themes');
+const { THEME_KEYS, FONTS, OPENER_KEYS, FX_KEYS } = require('./themes');
 
 const str = (v, max = 300) => (typeof v === 'string' ? v.replace(/\u0000/g, '').slice(0, max) : '');
 const bool = (v) => v === true;
@@ -31,6 +31,11 @@ function cleanContent(input) {
   const gifts = obj(c.gifts);
   const music = obj(c.music);
   const closing = obj(c.closing);
+  const family = obj(c.family);
+  const program = obj(c.program);
+  const lineup = obj(c.lineup);
+  const info = obj(c.info);
+  const partners = obj(c.partners);
 
   return {
     cover: {
@@ -40,8 +45,13 @@ function cleanContent(input) {
       photo: url(cover.photo),
       buttonText: str(cover.buttonText, 40),
     },
-    opening: { text: str(opening.text, 1500), source: str(opening.source, 200) },
+    opening: {
+      arabic: str(opening.arabic, 1200), showArabic: bool(opening.showArabic),
+      text: str(opening.text, 1500), showText: opening.showText !== false,
+      source: str(opening.source, 200),
+    },
     hostsHeading: str(c.hostsHeading, 80),
+    family: { heading: str(family.heading, 80), text: str(family.text, 800) },
     hosts: arr(c.hosts, 6).map((h) => {
       h = obj(h);
       return {
@@ -59,6 +69,22 @@ function cleanContent(input) {
         venue: str(e.venue, 120), address: str(e.address, 300), mapsUrl: url(e.mapsUrl),
       };
     }),
+    program: {
+      heading: str(program.heading, 80),
+      items: arr(program.items, 20).map((i) => { i = obj(i); return { time: str(i.time, 20), title: str(i.title, 100), text: str(i.text, 300) }; }),
+    },
+    lineup: {
+      heading: str(lineup.heading, 80),
+      items: arr(lineup.items, 12).map((i) => { i = obj(i); return { name: str(i.name, 100), role: str(i.role, 100), photo: url(i.photo), text: str(i.text, 300) }; }),
+    },
+    info: {
+      heading: str(info.heading, 80),
+      items: arr(info.items, 10).map((i) => { i = obj(i); return { title: str(i.title, 100), text: str(i.text, 400) }; }),
+    },
+    partners: {
+      heading: str(partners.heading, 80),
+      items: arr(partners.items, 12).map((i) => { i = obj(i); return { name: str(i.name, 100), logo: url(i.logo), url: url(i.url) }; }),
+    },
     story: arr(c.story, 10).map((s) => {
       s = obj(s);
       return { date: str(s.date, 40), title: str(s.title, 100), text: str(s.text, 600) };
@@ -95,9 +121,13 @@ function cleanSettings(input) {
     musicAutoplay: s.musicAutoplay !== false,
     wishesModerated: bool(s.wishesModerated),
     waTemplate: str(s.waTemplate, 600),
+    opener: s.opener === 'none' || OPENER_KEYS.includes(s.opener) ? s.opener : '',
+    fx: s.fx === 'none' || FX_KEYS.includes(s.fx) ? s.fx : '',
     sections: {
       story: bool(sec.story), gallery: sec.gallery !== false, dresscode: bool(sec.dresscode),
       rsvp: sec.rsvp !== false, gifts: bool(sec.gifts), wishes: sec.wishes !== false,
+      family: bool(sec.family), program: bool(sec.program), lineup: bool(sec.lineup),
+      info: bool(sec.info), partners: bool(sec.partners),
     },
   };
 }
@@ -134,5 +164,5 @@ const slugError = (s) => {
 };
 
 module.exports = {
-  str, int, url, cleanContent, cleanSettings, cleanColors, cleanFonts, cleanSlug, slugError, THEME_KEYS,
+  str, int, url, arr, obj, bool, hex, cleanContent, cleanSettings, cleanColors, cleanFonts, cleanSlug, slugError, THEME_KEYS,
 };

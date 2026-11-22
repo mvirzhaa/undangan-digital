@@ -1,7 +1,7 @@
 # Undangan Digital
 
 Pembuat undangan website untuk **pernikahan, lamaran, ulang tahun, gala (mis. Met Gala), dan acara lainnya**.
-Struktur dashboard meniru alur layanan sejenis: **Dasbor · Tampilan · Isi · Tamu · Pengaturan**, lengkap dengan pratinjau langsung dan halaman undangan publik.
+Struktur dashboard meniru alur layanan sejenis: **Dasbor · Tampilan · Isi · Versi undangan · Tamu · Pengaturan**, lengkap dengan pratinjau langsung dan halaman undangan publik.
 
 Stack: **Node.js (Express 5) + PostgreSQL**, tampilan dirender di server dengan EJS, JavaScript murni di browser (tanpa build step).
 
@@ -10,10 +10,13 @@ Stack: **Node.js (Express 5) + PostgreSQL**, tampilan dirender di server dengan 
 | Area | Isi |
 |---|---|
 | Akun | Daftar/masuk (bcrypt + JWT di cookie httpOnly), setiap akun hanya melihat undangannya sendiri |
-| Jenis acara | Pernikahan, Lamaran, Ulang Tahun, Gala/Acara Formal, Lainnya (isi awal & label menyesuaikan) |
-| Tampilan | 8 tema (Glass Rose, Ivory Minimal, Sage Floral, Noir Gold, Confetti Pop, Midnight Royal, Terracotta Boho, Neon Night), 11 palet warna + warna kustom, 12 pilihan font |
-| Isi | Sampul + foto, kata pembuka, profil penyelenggara/mempelai (1–6), sesi acara (tanggal, zona WIB/WITA/WIT, peta Google), cerita, galeri, dresscode, hadiah (rekening/QRIS/alamat), musik latar, penutup |
-| Tamu | Daftar tamu + link personal (`/slug?to=kode`), impor/ekspor CSV, tombol WhatsApp, kartu QR, RSVP (hadir/tidak/belum pasti, jumlah, pilihan menu), buku ucapan dengan moderasi, check-in hari-H |
+| Jenis acara | Pernikahan, Lamaran, Ulang Tahun, Gala/Acara Formal, Lainnya. **Isian di menu Isi berbeda per jenis** (mis. pernikahan: mempelai, turut mengundang, cerita cinta, amplop digital; ulang tahun: rangkaian acara, wishlist, info penting; gala: susunan acara, pengisi acara, sponsor, info akses; lainnya: agenda & info) |
+| Template | **11 template**, tiap jenis punya template sendiri: pernikahan 3 (Glass Rose, Royal Book, Sage Garden), lamaran 2 (Ivory Minimal, Terracotta Boho), ulang tahun 2 (Confetti Pop, Neon Night), gala 2 (Noir Gold, Velvet Night), lainnya 2 (Corporate Slate, Sunny Fest). 11 palet warna + warna kustom, 12 font |
+| Animasi pembuka | 7 animasi CSS 3D saat tamu menekan tombol buka: **amplop, buku terbuka, kartu membalik (flip), pintu ganda, tirai panggung, lingkaran membuka, kerai/shutter**. Tiap template punya bawaan, bisa diganti/dimatikan, ada tombol "Coba animasi". Efek latar: kelopak, kilau, konfeti, gelembung. Menghormati "kurangi gerakan" |
+| Versi undangan | Buat beberapa versi (mis. **VIP** dan reguler) dengan template, warna, animasi, teks sampul/penutup, sesi acara, catatan khusus, dan bagian berbeda. Tamu diberi versi satu per satu, massal (centang), atau lewat kolom `Versi` di Excel; link personalnya otomatis menampilkan versinya |
+| Pembuka pernikahan | **QS. Ar-Rum: 21** (Arab + terjemahan Indonesia) terisi bawaan; teks Arab dan terjemahan masing-masing bisa dipakai atau dimatikan, dan bisa dipulihkan dengan satu tombol |
+| Isi | Sampul + foto, kata pembuka, profil penyelenggara/mempelai, sesi acara (tanggal, zona WIB/WITA/WIT, peta Google), cerita, galeri, dresscode, hadiah (rekening/QRIS/alamat), musik latar, penutup |
+| Tamu | Daftar tamu + link personal (`/slug?to=kode`), **impor/ekspor Excel (.xlsx)** (template berisi dropdown Jenis & Versi, impor ulang memperbarui tamu lewat kolom Kode), tombol WhatsApp, kartu QR, RSVP (hadir/tidak/belum pasti, jumlah, pilihan menu), buku ucapan dengan moderasi, check-in hari-H |
 | Undangan publik | Sampul dengan nama tamu, hitung mundur, simpan ke kalender (.ics), peta, galeri + lightbox, RSVP, ucapan, salin rekening, musik, mode privat, dua bahasa label (ID/EN), tampil 2 kolom di desktop |
 | Pengaturan | Ganti alamat link, aktif/nonaktif, mode privat, tombol bagian, batas RSVP, duplikat & hapus undangan |
 
@@ -34,7 +37,9 @@ npm run seed                               # (opsional) akun demo: demo@example.
 npm start                                  # http://localhost:3000
 ```
 
-Uji otomatis (20 skenario end-to-end termasuk keamanan): `npm test` (membuat lalu menghapus data uji sendiri).
+**Sudah punya data dari versi sebelumnya?** Jalankan `npm run migrate` lagi (menambah kolom `versions` dan `version_id`, serta mengganti nama template lama; aman diulang).
+
+Uji otomatis (27 skenario end-to-end termasuk keamanan, Excel, versi, dan template): `npm test` (membuat lalu menghapus data uji sendiri).
 
 ## Struktur proyek
 
@@ -46,12 +51,14 @@ src/routes/auth.js       Daftar / masuk / keluar
 src/routes/invitations.js API pemilik: undangan, tamu, RSVP, ucapan, unggah, check-in, ekspor
 src/routes/public.js     Halaman /:slug, RSVP & ucapan publik, kalender .ics
 src/routes/pages.js      Landing, login, dashboard, editor, pratinjau
-src/lib/themes.js        Jenis acara, tema, palet, font
+src/lib/themes.js        Jenis acara (menu & bagian per jenis), 11 template, animasi, efek, teks Ar-Rum 21
+src/lib/versions.js      Versi undangan (sanitasi + penggabungan override per tamu)
+src/lib/excel.js         Impor/ekspor .xlsx (ExcelJS), pemeriksaan berkas & anti zip-bomb
 src/lib/defaults.js      Isi awal per jenis acara
 src/lib/sanitize.js      Validasi/pembersihan semua input editor
 src/lib/render.js        View model halaman undangan
 views/                   Template EJS (invitation.ejs = undangan publik)
-public/css, public/js    Gaya & JavaScript (editor.js = editor dashboard)
+public/css, public/js    Gaya & JavaScript (openers.css = animasi pembuka & efek; editor.js = editor dashboard)
 ```
 
 ### Model data
@@ -61,7 +68,7 @@ Isi undangan disimpan sebagai **JSONB** (`content`, `settings`, `colors`, `fonts
 ### Rute utama
 
 - Halaman: `/` · `/login` · `/register` · `/dashboard` · `/editor/:id?main_menu=data&form=cover` · `/preview/:id` · `/:slug` (undangan publik, `?to=kode` untuk tamu)
-- API pemilik (`/api/...`, wajib login): `invitations` (CRUD, `duplicate`, `upload`, `stats`), `invitations/:id/guests` (+`import`, `qr.svg`, `checkin`), `rsvps`, `wishes`, `export/*.csv`
+- API pemilik (`/api/...`, wajib login): `invitations` (CRUD, `duplicate`, `upload`, `stats`), `invitations/:id/guests` (+`import`, `qr.svg`, `checkin`), `rsvps`, `wishes`, `guests/import` (.xlsx), `guests/bulk`, `guests/template.xlsx`, `export/guests.xlsx`, `export/rsvps.xlsx`
 - API tamu (`/api/public/:slug/...`): `POST rsvp`, `POST wish`, `GET wishes`
 
 ## Keamanan (yang sudah diterapkan)
@@ -71,7 +78,7 @@ Isi undangan disimpan sebagai **JSONB** (`content`, `settings`, `colors`, `fonts
 - Cookie sesi `httpOnly` + `SameSite=Lax` (`Secure` saat `NODE_ENV=production`); kata sandi di-hash bcrypt.
 - Setiap query undangan/tamu/RSVP dibatasi `user_id` pemilik (pengguna lain mendapat 404).
 - Unggahan: hanya JPG/PNG/WebP/GIF (gambar) atau MP3/OGG/WAV/M4A (musik), diperiksa *magic bytes*, nama file acak, SVG ditolak.
-- Pembatas laju untuk login/daftar dan kiriman RSVP/ucapan publik; ekspor CSV mencegah injeksi rumus.
+- Pembatas laju untuk login/daftar dan kiriman RSVP/ucapan publik; impor Excel dibatasi 2 MB / 1000 baris, memeriksa tanda tangan zip dan total ukuran setelah diekstrak, dan ekspor menyimpan isi sel sebagai teks (bukan rumus).
 
 ## Menuju production
 

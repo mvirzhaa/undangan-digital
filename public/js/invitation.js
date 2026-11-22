@@ -11,10 +11,21 @@
   var $ = function (s, r) { return (r || document).querySelector(s); };
   var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
 
-  // Di pratinjau editor (?open=1) sampul langsung dibuka.
-  if (data.preview && /[?&]open=1/.test(location.search)) {
+  var opener = $('#opener');
+  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  // Lama animasi pembuka (ms) sebelum halaman undangan dibuka penuh.
+  var DUR = { envelope: 2400, book: 2500, flip: 2300, doors: 2000, curtain: 2100, iris: 2400, shutter: 2000 };
+
+  function reveal() {
     document.body.classList.remove('locked');
     document.body.classList.add('opened');
+    if (opener) { opener.classList.add('end'); setTimeout(function () { opener.hidden = true; }, 1000); }
+  }
+
+  // Di pratinjau editor (?open=1) undangan langsung terbuka tanpa animasi pembuka.
+  if (data.preview && !data.demo && /[?&]open=1/.test(location.search)) {
+    if (opener) opener.hidden = true;
+    reveal();
   }
 
   // ----- buka undangan -----
@@ -26,12 +37,23 @@
     var p = bgm.play();
     if (p && p.then) p.then(function () { setPlaying(true); }).catch(function () { setPlaying(false); });
   }
-  $('#open-btn').addEventListener('click', function () {
-    document.body.classList.remove('locked');
-    document.body.classList.add('opened');
-    var next = $('#opening') || $('#hosts') || $('#events');
-    if (next) next.scrollIntoView({ behavior: 'smooth' });
+  var openBtn = $('#open-btn');
+  var opened = false;
+  if (openBtn) openBtn.addEventListener('click', function () {
+    if (opened) return;
+    opened = true;
     if (data.autoplay) playMusic();
+    var after = function () {
+      reveal();
+      var next = $('#opening') || $('#hosts') || $('#events');
+      if (next) setTimeout(function () { next.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth' }); }, 350);
+    };
+    if (opener && !reduce) {
+      opener.classList.add('go');
+      setTimeout(after, DUR[data.opener] || 2200);
+    } else {
+      after();
+    }
   });
   if (musicBtn) {
     musicBtn.addEventListener('click', function () {
@@ -107,7 +129,6 @@
   // ----- kirim form -----
   function post(path, body) {
     body.to = data.to;
-    var basePath = data.basePath || '';
     return fetch(basePath + '/api/public/' + encodeURIComponent(data.slug) + path, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
     }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); });
@@ -152,7 +173,6 @@
   function esc(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
   function loadWishes() {
     if (!list || data.preview) { if (list) list.innerHTML = '<p class="muted">' + esc(L.noWishes) + '</p>'; return; }
-    var basePath = data.basePath || '';
     fetch(basePath + '/api/public/' + encodeURIComponent(data.slug) + '/wishes').then(function (r) { return r.json(); }).then(function (j) {
       if (!j.wishes || !j.wishes.length) { list.innerHTML = '<p class="muted">' + esc(L.noWishes) + '</p>'; return; }
       list.innerHTML = j.wishes.map(function (w) {

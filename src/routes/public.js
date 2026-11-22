@@ -5,6 +5,7 @@ const { rateLimit } = require('../auth');
 const { buildView, safeJson, OFFSET } = require('../lib/render');
 const i18n = require('../lib/i18n');
 const S = require('../lib/sanitize');
+const { applyVersion } = require('../lib/versions');
 
 const api = express.Router();
 const pages = express.Router();
@@ -28,9 +29,8 @@ api.post('/:slug/rsvp', postLimiter, async (req, res) => {
   const inv = await findPublished(req.params.slug);
   if (!inv) return res.status(404).json({ error: 'Undangan tidak ditemukan.' });
   const t = i18n(inv.settings.lang);
-  if (inv.settings.sections.rsvp === false) return res.status(403).json({ error: 'RSVP dinonaktifkan.' });
-
   const guest = await findGuest(inv.id, req.body.to);
+  if (applyVersion(inv, guest && guest.version_id).inv.settings.sections.rsvp === false) return res.status(403).json({ error: 'RSVP dinonaktifkan.' });
   if (inv.settings.privateMode && !guest) return res.status(403).json({ error: t.privateText });
 
   const today = new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 10);
@@ -80,9 +80,8 @@ api.post('/:slug/wish', postLimiter, async (req, res) => {
   const inv = await findPublished(req.params.slug);
   if (!inv) return res.status(404).json({ error: 'Undangan tidak ditemukan.' });
   const t = i18n(inv.settings.lang);
-  if (inv.settings.sections.wishes === false) return res.status(403).json({ error: 'Ucapan dinonaktifkan.' });
-
   const guest = await findGuest(inv.id, req.body.to);
+  if (applyVersion(inv, guest && guest.version_id).inv.settings.sections.wishes === false) return res.status(403).json({ error: 'Ucapan dinonaktifkan.' });
   if (inv.settings.privateMode && !guest) return res.status(403).json({ error: t.privateText });
 
   const name = guest ? guest.name : S.str(req.body.name, 160).trim();

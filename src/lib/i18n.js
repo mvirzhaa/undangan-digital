@@ -18,6 +18,8 @@ const dict = {
     nav_hosts: 'Profil', nav_events: 'Acara', nav_rsvp: 'Hadir', nav_wishes: 'Ucapan',
     previewNotice: 'Mode pratinjau: pengiriman data dinonaktifkan.', madeWith: 'Dibuat dengan',
     error: 'Terjadi kesalahan, coba lagi.', until: 'sampai selesai',
+    program: 'Rangkaian Acara', lineup: 'Pengisi Acara', info: 'Info Penting', partners: 'Didukung Oleh', family: 'Turut Mengundang',
+    nav_program: 'Agenda', openerHint: 'Ketuk untuk membuka',
   },
   en: {
     dear: 'Dear', guestFallback: 'Dear Guest', open: 'Open Invitation', scroll: 'Scroll down',
@@ -37,8 +39,38 @@ const dict = {
     nav_hosts: 'Hosts', nav_events: 'Schedule', nav_rsvp: 'RSVP', nav_wishes: 'Wishes',
     previewNotice: 'Preview mode: submissions are disabled.', madeWith: 'Made with',
     error: 'Something went wrong, please try again.', until: 'until end',
+    program: 'Programme', lineup: 'Featured Guests', info: 'Good to Know', partners: 'Supported By', family: 'Together With',
+    nav_program: 'Programme', openerHint: 'Tap to open',
   },
 };
 
-module.exports = (lang) => dict[lang] || dict.id;
+// Penyesuaian kata menurut jenis acara (menimpa kamus dasar).
+const byType = {
+  wedding: {
+    id: { rsvpIntro: 'Merupakan kebahagiaan bagi kami apabila Bapak/Ibu/Saudara/i berkenan hadir. Mohon konfirmasi kehadiran Anda.', events: 'Akad & Resepsi', wishes: 'Ucapan & Doa Restu', wishMessage: 'Tulis ucapan & doa restu' },
+    en: { rsvpIntro: 'It would mean the world to us if you could celebrate with us. Kindly let us know.', wishes: 'Wishes & Blessings' },
+  },
+  engagement: {
+    id: { wishes: 'Ucapan & Doa Restu', wishMessage: 'Tulis ucapan & doa restu' },
+    en: { wishes: 'Wishes & Blessings' },
+  },
+  birthday: {
+    id: { rsvpIntro: 'Yuk, kabari kami kamu bisa datang atau tidak ya!', wishes: 'Ucapan Selamat', wishMessage: 'Tulis ucapan selamat ulang tahun', gifts: 'Wishlist Hadiah', giftsIntro: 'Kehadiranmu sudah cukup. Kalau mau memberi hadiah, ini beberapa pilihannya:', story: 'Cerita' },
+    en: { rsvpIntro: "Let us know if you can make it!", wishes: 'Birthday Wishes', wishMessage: 'Write your birthday wishes', gifts: 'Gift Wishlist' },
+  },
+  gala: {
+    id: { rsvpIntro: 'Kehadiran Anda wajib dikonfirmasi untuk keperluan registrasi.', wishes: 'Pesan & Ucapan', dear: 'Kepada Yth.', yes: 'Hadir', no: 'Berhalangan' },
+    en: { rsvpIntro: 'Kindly confirm your attendance for registration purposes.', yes: 'Accepts with pleasure', no: 'Regretfully declines', dear: 'Dear', wishes: 'Messages' },
+  },
+  other: {
+    id: { rsvpIntro: 'Mohon konfirmasi kehadiran Anda agar kami dapat mempersiapkan acara dengan baik.' },
+    en: { rsvpIntro: 'Please confirm your attendance so we can plan accordingly.' },
+  },
+};
+
+module.exports = (lang, type) => {
+  const l = dict[lang] ? lang : 'id';
+  const extra = type && byType[type] && byType[type][l];
+  return extra ? { ...dict[l], ...extra } : dict[l];
+};
 module.exports.dict = dict;

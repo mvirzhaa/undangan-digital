@@ -3,7 +3,7 @@ const express = require('express');
 const { query } = require('../db');
 const cfg = require('../config');
 const { requirePage } = require('../auth');
-const { EVENT_TYPES, THEMES, PALETTES, FONTS } = require('../lib/themes');
+const { EVENT_TYPES, THEMES, PALETTES, FONTS, OPENERS, EFFECTS, AR_RUM_21 } = require('../lib/themes');
 const { buildView, safeJson } = require('../lib/render');
 
 const router = express.Router();
@@ -28,7 +28,7 @@ router.get('/editor/:id', requirePage, async (req, res, next) => {
   if (!inv) return next();
   const boot = {
     invitation: inv,
-    meta: { eventTypes: EVENT_TYPES, themes: THEMES, palettes: PALETTES, fonts: FONTS },
+    meta: { eventTypes: EVENT_TYPES, themes: THEMES, openers: OPENERS, effects: EFFECTS, arRum21: AR_RUM_21, palettes: PALETTES, fonts: FONTS },
     baseUrl: cfg.baseUrl,
     basePath: cfg.basePath,
     user: req.user,
@@ -45,8 +45,10 @@ router.get('/preview/:id', requirePage, async (req, res, next) => {
     const g = await query('SELECT * FROM guests WHERE id = $1 AND invitation_id = $2', [req.query.guest, inv.id]);
     guest = g.rows[0] || null;
   }
-  if (!guest) guest = { name: 'Nama Tamu', code: '', pax_limit: 2 };
-  const view = buildView(inv, { guest, preview: true });
+  if (!guest) guest = { name: 'Nama Tamu', code: '', pax_limit: 2, version_id: '' };
+  // ?version=ID mencoba versi tertentu; ?demo=1 menampilkan animasi pembuka (tanpa auto-buka).
+  const versionId = (inv.versions || []).some((v) => v.id === req.query.version) ? req.query.version : '';
+  const view = buildView(inv, { guest, preview: true, versionId, demo: req.query.demo === '1' });
   res.set('Cache-Control', 'no-store');
   res.render('invitation', { ...view, safeJson });
 });
