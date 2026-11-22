@@ -3,6 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="base-path" content="<%= basePath %>">
   <title>Editor — <%= inv.title %></title>
   <link rel="stylesheet" href="<%= basePath %>/css/app.css">
 </head>
@@ -37,7 +38,6 @@
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
   <script type="application/json" id="boot"><%- boot %></script>
-  <script>window.__BASE_PATH__ = "<%= basePath %>";</script>
   <script src="<%= basePath %>/js/editor.js"></script>
 </body>
 </html>

@@ -3,6 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="base-path" content="<%= basePath %>">
   <title><%= mode === 'login' ? 'Masuk' : 'Daftar' %> — Undangan Digital</title>
   <link rel="stylesheet" href="<%= basePath %>/css/app.css">
 </head>
@@ -23,7 +24,6 @@
       <% if (mode === 'login') { %>Belum punya akun? <a href="<%= basePath %>/register">Daftar</a><% } else { %>Sudah punya akun? <a href="<%= basePath %>/login">Masuk</a><% } %>
     </p>
   </main>
-  <script>window.__BASE_PATH__ = "<%= basePath %>";</script>
   <script src="<%= basePath %>/js/auth.js"></script>
 </body>
 </html>

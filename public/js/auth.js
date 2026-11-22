@@ -1,6 +1,9 @@
 (function () {
   'use strict';
-  var basePath = window.__BASE_PATH__ || '';
+  var metaTag = document.querySelector('meta[name="base-path"]');
+  var basePath = (metaTag && metaTag.content) ||
+    (location.pathname.startsWith('/undangan-digital') ? '/undangan-digital' : '') ||
+    '';
   var form = document.getElementById('auth-form');
   var msg = form.querySelector('.form-msg');
   form.addEventListener('submit', function (e) {

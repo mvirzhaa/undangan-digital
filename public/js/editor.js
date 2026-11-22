@@ -3,7 +3,11 @@
   'use strict';
 
   var boot = JSON.parse(document.getElementById('boot').textContent);
-  var basePath = boot.basePath || window.__BASE_PATH__ || '';
+  var metaTag = document.querySelector('meta[name="base-path"]');
+  var basePath = (boot && boot.basePath) ||
+    (metaTag && metaTag.content) ||
+    (location.pathname.startsWith('/undangan-digital') ? '/undangan-digital' : '') ||
+    '';
   var meta = boot.meta;
   var inv = boot.invitation;               // objek ini menjadi "state" yang diedit
   var API = basePath + '/api/invitations/' + inv.id;

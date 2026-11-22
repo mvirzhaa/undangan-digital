@@ -2,6 +2,11 @@
 (function () {
   'use strict';
   var data = JSON.parse(document.getElementById('inv-data').textContent);
+  var metaTag = document.querySelector('meta[name="base-path"]');
+  var basePath = (data && data.basePath) ||
+    (metaTag && metaTag.content) ||
+    (location.pathname.startsWith('/undangan-digital') ? '/undangan-digital' : '') ||
+    '';
   var L = data.labels;
   var $ = function (s, r) { return (r || document).querySelector(s); };
   var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };

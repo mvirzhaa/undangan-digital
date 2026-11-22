@@ -3,6 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="base-path" content="<%= basePath %>">
   <title>Dashboard — Undangan Digital</title>
   <link rel="stylesheet" href="<%= basePath %>/css/app.css">
 </head>
@@ -49,7 +50,6 @@
   </dialog>
 
   <script type="application/json" id="boot"><%- safeJson({ eventTypes: eventTypes, basePath: basePath }) %></script>
-  <script>window.__BASE_PATH__ = "<%= basePath %>";</script>
   <script src="<%= basePath %>/js/dashboard.js"></script>
 </body>
 </html>
