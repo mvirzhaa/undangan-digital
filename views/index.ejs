@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Undangan Digital — buat undangan website untuk acara apa pun</title>
+  <meta name="description" content="Buat undangan digital untuk pernikahan, ulang tahun, gala, dan acara lainnya. Lengkap dengan RSVP, buku tamu, link personal, dan musik.">
+  <link rel="stylesheet" href="<%= basePath %>/css/app.css">
+</head>
+<body class="landing">
+  <header class="land-top">
+    <a class="brand-logo" href="<%= basePath %>/">✉ Undangan Digital</a>
+    <nav>
+      <% if (user) { %>
+        <a class="btn" href="<%= basePath %>/dashboard">Buka dashboard</a>
+      <% } else { %>
+        <a href="<%= basePath %>/login">Masuk</a>
+        <a class="btn primary" href="<%= basePath %>/register">Coba gratis</a>
+      <% } %>
+    </nav>
+  </header>
+
+  <section class="hero">
+    <h1>Satu undangan,<br>untuk setiap momen berharga.</h1>
+    <p>Pernikahan, ulang tahun, gala, lamaran, hingga reuni. Pilih desain, isi data, bagikan link personal ke tiap tamu, dan pantau konfirmasi kehadiran dari satu dashboard.</p>
+    <div class="hero-cta">
+      <a class="btn primary big" href="<%= user ? (basePath + '/dashboard') : (basePath + '/register') %>">Buat undangan sekarang</a>
+    </div>
+    <ul class="chips">
+      <% Object.keys(eventTypes).forEach(function (k) { %><li><%= eventTypes[k].label %></li><% }) %>
+    </ul>
+  </section>
+
+  <section class="features">
+    <div><h3>Editor dengan pratinjau langsung</h3><p>Ubah teks, warna, font, dan foto; hasilnya langsung terlihat di layar ponsel maupun laptop.</p></div>
+    <div><h3>Link personal tiap tamu</h3><p>Nama tamu tampil di sampul. Impor daftar tamu dari CSV, kirim lewat WhatsApp, dan unduh kartu QR.</p></div>
+    <div><h3>RSVP, ucapan & hadiah</h3><p>Konfirmasi kehadiran, pilihan menu, buku ucapan dengan moderasi, serta nomor rekening dan QRIS.</p></div>
+    <div><h3>Check-in hari-H</h3><p>Catat kedatangan tamu dengan kode atau QR, lengkap dengan jumlah tamu yang hadir.</p></div>
+  </section>
+
+  <section class="theme-showcase">
+    <h2>Desain bawaan</h2>
+    <div class="theme-row">
+      <% themes.forEach(function (t) { %>
+        <div class="theme-chip" style="background:<%= t.colors.bg %>;color:<%= t.colors.text %>;border-color:<%= t.colors.primary %>">
+          <span class="dot" style="background:<%= t.colors.primary %>"></span><span class="dot" style="background:<%= t.colors.accent %>"></span>
+          <strong style="font-family:'<%= t.fonts.heading %>',serif"><%= t.name %></strong>
+          <small><%= t.category %></small>
+        </div>
+      <% }) %>
+    </div>
+  </section>
+
+  <footer class="land-foot">Undangan Digital · Node.js + PostgreSQL</footer>
+</body>
+</html>

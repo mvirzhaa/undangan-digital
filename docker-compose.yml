@@ -1,0 +1,17 @@
+# PostgreSQL untuk pengembangan lokal:  docker compose up -d
+# Lalu: cp .env.example .env && npm install && npm run migrate && npm start
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: undangan
+      POSTGRES_PASSWORD: undangan123
+      POSTGRES_DB: undangan_digital
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:

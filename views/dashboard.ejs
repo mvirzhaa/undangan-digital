@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dashboard — Undangan Digital</title>
+  <link rel="stylesheet" href="<%= basePath %>/css/app.css">
+</head>
+<body class="dash-page">
+  <header class="land-top">
+    <a class="brand-logo" href="<%= basePath %>/">✉ Undangan Digital</a>
+    <nav>
+      <span class="who"><%= user.name %></span>
+      <button class="btn" id="logout-btn" type="button">Keluar</button>
+    </nav>
+  </header>
+
+  <main class="dash">
+    <div class="dash-head">
+      <div>
+        <h1>Undangan saya</h1>
+        <p class="muted">Kelola semua undangan, tamu, dan konfirmasi kehadiran.</p>
+      </div>
+      <button class="btn primary big" id="new-btn" type="button">+ Buat undangan</button>
+    </div>
+    <div id="list" class="inv-grid" aria-live="polite"><p class="muted">Memuat…</p></div>
+  </main>
+
+  <dialog id="new-dialog" class="modal">
+    <form method="dialog" id="new-form">
+      <h2>Buat undangan baru</h2>
+      <label>Jenis acara
+        <select name="event_type">
+          <% Object.keys(eventTypes).forEach(function (k) { %><option value="<%= k %>"><%= eventTypes[k].label %></option><% }) %>
+        </select>
+      </label>
+      <label>Judul undangan
+        <input type="text" name="title" placeholder="mis. Nadila & Azka / Ulang Tahun Sinta ke-17" required maxlength="200">
+      </label>
+      <label>Alamat link <small>(opsional, huruf kecil/angka/minus)</small>
+        <div class="prefix"><span id="host-prefix"></span><input type="text" name="slug" maxlength="60" placeholder="otomatis dari judul"></div>
+      </label>
+      <p class="form-msg" role="alert"></p>
+      <div class="modal-actions">
+        <button type="button" class="btn" id="cancel-new">Batal</button>
+        <button type="submit" class="btn primary">Buat & lanjut edit</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script type="application/json" id="boot"><%- safeJson({ eventTypes: eventTypes, basePath: basePath }) %></script>
+  <script>window.__BASE_PATH__ = "<%= basePath %>";</script>
+  <script src="<%= basePath %>/js/dashboard.js"></script>
+</body>
+</html>

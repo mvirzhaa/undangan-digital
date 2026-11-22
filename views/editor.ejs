@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Editor — <%= inv.title %></title>
+  <link rel="stylesheet" href="<%= basePath %>/css/app.css">
+</head>
+<body class="editor-page">
+  <header class="ed-top">
+    <a class="icon-btn" href="<%= basePath %>/dashboard" aria-label="Kembali ke dashboard" title="Kembali">←</a>
+    <div class="ed-title"><strong id="ed-title"></strong><small id="ed-status" class="muted">Tersimpan</small></div>
+    <div class="ed-top-actions">
+      <button type="button" class="btn small" id="btn-preview-toggle">Pratinjau</button>
+      <button type="button" class="btn small" id="btn-share">Bagikan</button>
+      <button type="button" class="btn small primary" id="btn-publish">Aktifkan</button>
+    </div>
+  </header>
+
+  <div class="ed-layout">
+    <nav class="ed-side" id="side" aria-label="Menu editor"></nav>
+    <main class="ed-panel" id="panel" tabindex="-1"></main>
+    <aside class="ed-preview" id="preview-pane">
+      <div class="pv-bar">
+        <span>Pratinjau</span>
+        <div>
+          <button type="button" class="seg active" data-device="phone">Ponsel</button>
+          <button type="button" class="seg" data-device="laptop">Laptop</button>
+          <a class="seg" id="pv-open" target="_blank" rel="noopener">Buka ↗</a>
+        </div>
+      </div>
+      <div class="pv-frame-wrap"><iframe id="preview" title="Pratinjau undangan" src="about:blank"></iframe></div>
+    </aside>
+  </div>
+
+  <dialog id="dlg" class="modal"></dialog>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <script type="application/json" id="boot"><%- boot %></script>
+  <script>window.__BASE_PATH__ = "<%= basePath %>";</script>
+  <script src="<%= basePath %>/js/editor.js"></script>
+</body>
+</html>

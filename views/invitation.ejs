@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="<%= lang %>">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title><%= inv.title %></title>
+  <meta name="description" content="<%= c.cover.subtitle %>">
+  <meta name="robots" content="<%= (preview || settings.privateMode) ? 'noindex,nofollow' : 'index,follow' %>">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="<%= inv.title %>">
+  <meta property="og:description" content="<%= c.cover.subtitle %>">
+  <meta property="og:url" content="<%= pageUrl %>">
+  <% if (ogImage) { %><meta property="og:image" content="<%= ogImage %>"><% } %>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="<%= fontsUrl %>">
+  <link rel="stylesheet" href="<%= basePath %>/css/invitation.css">
+  <link rel="stylesheet" href="<%= basePath %>/css/themes.css">
+</head>
+<body class="inv theme-<%= inv.theme %> type-<%= inv.event_type %> locked" style="<%= cssVars %>">
+<% const eventsWithDate = events; %>
+
+<div class="stage">
+  <aside class="stage-hero" aria-hidden="true">
+    <div class="stage-hero-bg"></div>
+    <div class="stage-hero-text">
+      <small><%= c.cover.label %></small>
+      <h2><%= c.cover.title %></h2>
+      <% if (eventsWithDate[0] && eventsWithDate[0].dateLabel) { %><p><%= eventsWithDate[0].dateLabel %></p><% } %>
+    </div>
+  </aside>
+
+  <main class="col" id="top">
+    <% if (preview) { %><div class="preview-bar"><%= t.previewNotice %></div><% } %>
+
+    <!-- SAMPUL -->
+    <section class="cover" id="cover">
+      <div class="cover-inner reveal">
+        <small class="label"><%= c.cover.label %></small>
+        <h1><%= c.cover.title %></h1>
+        <% if (c.cover.subtitle) { %><p class="sub"><%= c.cover.subtitle %></p><% } %>
+        <div class="orn" aria-hidden="true"></div>
+        <% if (eventsWithDate[0] && eventsWithDate[0].dateLabel) { %><p class="cover-date"><%= eventsWithDate[0].dateLabel %></p><% } %>
+        <div class="guest-box">
+          <span><%= t.dear %></span>
+          <strong><%= guest ? guest.name : t.guestFallback %></strong>
+        </div>
+        <button type="button" class="btn primary" id="open-btn"><%= c.cover.buttonText || t.open %></button>
+      </div>
+      <span class="scroll-hint"><%= t.scroll %></span>
+    </section>
+
+    <!-- PEMBUKA -->
+    <% if (c.opening.text) { %>
+    <section class="sec opening" id="opening">
+      <div class="reveal">
+        <div class="orn" aria-hidden="true"></div>
+        <p class="quote"><%= c.opening.text %></p>
+        <% if (c.opening.source) { %><p class="quote-src"><%= c.opening.source %></p><% } %>
+      </div>
+    </section>
+    <% } %>
+
+    <!-- PROFIL / PENYELENGGARA -->
+    <% if (c.hosts.length) { %>
+    <section class="sec hosts" id="hosts">
+      <h2 class="reveal"><%= c.hostsHeading %></h2>
+      <div class="host-list">
+        <% c.hosts.forEach(function (h, i) { %>
+          <article class="host reveal">
+            <% if (h.photo) { %><img class="host-photo" src="<%= mediaUrl(h.photo) %>" alt="<%= h.name %>" loading="lazy"><% } %>
+            <small class="label"><%= h.role %></small>
+            <h3><%= h.name %><% if (h.title) { %><span class="title">, <%= h.title %></span><% } %></h3>
+            <% if (h.parents) { %><p class="muted"><%= h.parents %></p><% } %>
+            <% if (h.bio) { %><p class="bio"><%= h.bio %></p><% } %>
+            <% if (h.instagram) { %><a class="ig" href="https://instagram.com/<%= h.instagram %>" target="_blank" rel="noopener noreferrer">@<%= h.instagram %></a><% } %>
+          </article>
+          <% if (c.hosts.length === 2 && i === 0) { %><div class="amp reveal" aria-hidden="true">&amp;</div><% } %>
+        <% }) %>
+      </div>
+    </section>
+    <% } %>
+
+    <!-- ACARA -->
+    <% if (eventsWithDate.length) { %>
+    <section class="sec events" id="events">
+      <% if (target) { %>
+      <div class="countdown-wrap reveal">
+        <h2><%= c.countdownTitle || t.events %></h2>
+        <div class="countdown" id="countdown" data-target="<%= target %>">
+          <div><b data-u="d">0</b><span><%= t.days %></span></div>
+          <div><b data-u="h">0</b><span><%= t.hours %></span></div>
+          <div><b data-u="m">0</b><span><%= t.minutes %></span></div>
+          <div><b data-u="s">0</b><span><%= t.seconds %></span></div>
+        </div>
+      </div>
+      <% } %>
+      <% eventsWithDate.forEach(function (e) { %>
+        <article class="event-card reveal">
+          <h3><%= e.name %></h3>
+          <% if (e.dateLabel) { %><p class="ev-date"><%= e.dateLabel %></p><% } %>
+          <% if (e.timeLabel) { %><p class="ev-time"><%= e.timeLabel %></p><% } %>
+          <% if (e.venue) { %><p class="ev-venue"><strong><%= e.venue %></strong></p><% } %>
+          <% if (e.address) { %><p class="muted"><%= e.address %></p><% } %>
+          <% if (e.mapEmbed) { %>
+            <iframe class="map" src="<%= e.mapEmbed %>" loading="lazy" referrerpolicy="no-referrer-when-downgrade" title="<%= t.location %> <%= e.name %>"></iframe>
+          <% } %>
+          <div class="ev-actions">
+            <% if (e.mapLink) { %><a class="btn ghost" href="<%= e.mapLink %>" target="_blank" rel="noopener noreferrer"><%= t.openMaps %></a><% } %>
+            <% if (e.startIso && !preview) { %><a class="btn ghost" href="/<%= inv.slug %>/calendar.ics?e=<%= e.index %>"><%= t.saveCalendar %></a><% } %>
+          </div>
+        </article>
+      <% }) %>
+    </section>
+    <% } %>
+
+    <!-- CERITA -->
+    <% if (sections.story) { %>
+    <section class="sec story" id="story">
+      <h2 class="reveal"><%= t.story %></h2>
+      <ol class="timeline">
+        <% c.story.forEach(function (s) { %>
+          <li class="reveal"><small><%= s.date %></small><h3><%= s.title %></h3><p><%= s.text %></p></li>
+        <% }) %>
+      </ol>
+    </section>
+    <% } %>
+
+    <!-- GALERI -->
+    <% if (sections.gallery) { %>
+    <section class="sec gallery" id="gallery">
+      <h2 class="reveal"><%= t.gallery %></h2>
+      <div class="grid reveal">
+        <% c.gallery.forEach(function (g, i) { %>
+          <button type="button" class="thumb" data-lightbox="<%= mediaUrl(g) %>"><img src="<%= mediaUrl(g) %>" alt="<%= t.gallery %> <%= i + 1 %>" loading="lazy"></button>
+        <% }) %>
+      </div>
+    </section>
+    <% } %>
+
+    <!-- DRESS CODE -->
+    <% if (sections.dresscode) { %>
+    <section class="sec dresscode" id="dresscode">
+      <h2 class="reveal"><%= t.dresscode %></h2>
+      <div class="reveal">
+        <% if (c.dresscode.text) { %><p><%= c.dresscode.text %></p><% } %>
+        <% if (c.dresscode.colors.length) { %>
+          <div class="swatches"><% c.dresscode.colors.forEach(function (col) { %><span style="background:<%= col %>" title="<%= col %>"></span><% }) %></div>
+        <% } %>
+      </div>
+    </section>
+    <% } %>
+
+    <!-- RSVP -->
+    <% if (sections.rsvp) { %>
+    <section class="sec rsvp" id="rsvp">
+      <h2 class="reveal"><%= t.rsvp %></h2>
+      <p class="muted reveal"><%= t.rsvpIntro %>
+        <% if (c.rsvp.deadline) { %><br><%= t.rsvpDeadline %>: <strong><%= c.rsvp.deadline %></strong><% } %></p>
+      <% if (rsvpClosed) { %>
+        <p class="notice reveal"><%= t.rsvpClosed %></p>
+      <% } else { %>
+      <form id="rsvp-form" class="card form reveal" novalidate>
+        <label><%= t.rsvpName %>
+          <input type="text" name="name" maxlength="160" required <% if (guest && guest.code) { %>value="<%= guest.name %>" readonly<% } %>>
+        </label>
+        <fieldset>
+          <legend><%= t.attendance %></legend>
+          <label class="radio"><input type="radio" name="attendance" value="hadir" checked> <span><%= t.yes %></span></label>
+          <label class="radio"><input type="radio" name="attendance" value="tidak"> <span><%= t.no %></span></label>
+          <label class="radio"><input type="radio" name="attendance" value="ragu"> <span><%= t.maybe %></span></label>
+        </fieldset>
+        <label data-hide-when="tidak"><%= t.pax %>
+          <select name="pax">
+            <% for (let n = 1; n <= maxPax; n++) { %><option value="<%= n %>"><%= n %></option><% } %>
+          </select>
+        </label>
+        <% if (c.rsvp.menus.length) { %>
+        <label data-hide-when="tidak"><%= t.menu %>
+          <select name="menu">
+            <% c.rsvp.menus.forEach(function (m) { %><option value="<%= m %>"><%= m %></option><% }) %>
+          </select>
+        </label>
+        <% } %>
+        <label><%= t.note %>
+          <textarea name="note" rows="2" maxlength="500"></textarea>
+        </label>
+        <button type="submit" class="btn primary"><%= t.send %></button>
+        <p class="form-msg" role="status" aria-live="polite"></p>
+      </form>
+      <% } %>
+    </section>
+    <% } %>
+
+    <!-- HADIAH -->
+    <% if (sections.gifts) { %>
+    <section class="sec gifts" id="gifts">
+      <h2 class="reveal"><%= t.gifts %></h2>
+      <p class="muted reveal"><%= t.giftsIntro %></p>
+      <% c.gifts.accounts.forEach(function (a) { %>
+        <div class="card gift reveal">
+          <strong><%= a.bank %></strong>
+          <div class="acc-no"><%= a.number %></div>
+          <% if (a.name) { %><small>a.n. <%= a.name %></small><% } %>
+          <button type="button" class="btn ghost small" data-copy="<%= a.number %>"><%= t.copy %></button>
+          <% if (a.qris) { %><img class="qris" src="<%= mediaUrl(a.qris) %>" alt="QRIS <%= a.bank %>" loading="lazy"><% } %>
+        </div>
+      <% }) %>
+      <% if (c.gifts.address) { %>
+        <div class="card gift reveal">
+          <strong><%= t.giftAddress %></strong>
+          <% if (c.gifts.receiver) { %><div><%= c.gifts.receiver %></div><% } %>
+          <p><%= c.gifts.address %></p>
+          <button type="button" class="btn ghost small" data-copy="<%= c.gifts.address %>"><%= t.copy %></button>
+        </div>
+      <% } %>
+    </section>
+    <% } %>
+
+    <!-- UCAPAN -->
+    <% if (sections.wishes) { %>
+    <section class="sec wishes" id="wishes">
+      <h2 class="reveal"><%= t.wishes %></h2>
+      <form id="wish-form" class="card form reveal" novalidate>
+        <label><%= t.wishName %>
+          <input type="text" name="name" maxlength="160" required <% if (guest && guest.code) { %>value="<%= guest.name %>" readonly<% } %>>
+        </label>
+        <label><%= t.wishMessage %>
+          <textarea name="message" rows="3" maxlength="500" required></textarea>
+        </label>
+        <button type="submit" class="btn primary"><%= t.send %></button>
+        <p class="form-msg" role="status" aria-live="polite"></p>
+      </form>
+      <div id="wish-list" class="wish-list" aria-live="polite"></div>
+    </section>
+    <% } %>
+
+    <!-- PENUTUP -->
+    <section class="sec closing" id="closing">
+      <div class="reveal">
+        <div class="orn" aria-hidden="true"></div>
+        <% if (c.closing.text) { %><p><%= c.closing.text %></p><% } %>
+        <% if (c.closing.signature) { %><h2 class="sign"><%= c.closing.signature %></h2><% } %>
+      </div>
+      <footer class="brand"><%= t.madeWith %> Undangan Digital</footer>
+    </section>
+
+    <nav class="bottom-nav" id="bottom-nav" aria-label="Navigasi">
+      <% if (c.hosts.length) { %><a href="#hosts"><%= t.nav_hosts %></a><% } %>
+      <% if (eventsWithDate.length) { %><a href="#events"><%= t.nav_events %></a><% } %>
+      <% if (sections.rsvp) { %><a href="#rsvp"><%= t.nav_rsvp %></a><% } %>
+      <% if (sections.wishes) { %><a href="#wishes"><%= t.nav_wishes %></a><% } %>
+    </nav>
+  </main>
+</div>
+
+<% if (c.music.url) { %>
+  <audio id="bgm" src="<%= mediaUrl(c.music.url) %>" loop preload="none"></audio>
+  <button type="button" class="music-btn" id="music-btn" aria-label="Musik" title="<%= c.music.title || 'Musik' %>">♪</button>
+<% } %>
+
+<div class="lightbox" id="lightbox" hidden><button type="button" class="lb-close" aria-label="Tutup">×</button><img alt=""></div>
+
+<script type="application/json" id="inv-data"><%- safeJson(clientData) %></script>
+<script src="<%= basePath %>/js/invitation.js"></script>
+</body>
+</html>

@@ -1,0 +1,73 @@
+/* Variasi gaya per tema. Warna dasar tetap bisa diubah pemilik lewat editor (CSS variable). */
+
+/* Glass Rose — kaca buram lembut, sudut membulat */
+.theme-glass-rose { --radius: 24px; }
+.theme-glass-rose .card, .theme-glass-rose .event-card { background: rgba(255,255,255,.55); backdrop-filter: blur(10px); border-color: rgba(255,255,255,.8); }
+.theme-glass-rose .sec:nth-of-type(even) { background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 22%, var(--bg)), var(--bg)); }
+
+/* Ivory Minimal — garis tipis, tanpa ornamen berlebih */
+.theme-ivory-minimal { --radius: 4px; }
+.theme-ivory-minimal .btn { border-radius: 2px; text-transform: uppercase; letter-spacing: .12em; font-size: .78rem; }
+.theme-ivory-minimal .host-photo { border-radius: 2px; border: 1px solid var(--line); box-shadow: none; }
+.theme-ivory-minimal .countdown div { border-radius: 2px; background: transparent; color: var(--text); border: 1px solid var(--text); }
+.theme-ivory-minimal .guest-box { border-radius: 2px; }
+.theme-ivory-minimal h1, .theme-ivory-minimal h2 { font-weight: 500; letter-spacing: .03em; }
+
+/* Sage Floral — hijau lembut, hiasan daun pada judul */
+.theme-sage-floral h2::before, .theme-sage-floral h2::after { content: '❦'; color: var(--accent); font-size: .8em; margin: 0 .5em; }
+.theme-sage-floral .host-photo { border-radius: 50%; width: 210px; height: 210px; }
+.theme-sage-floral .cover { background: linear-gradient(rgba(35,60,40,.35), rgba(35,60,40,.6)), var(--cover-img, none) center/cover, linear-gradient(160deg, var(--primary), #8fae8b); }
+
+/* Noir Gold — gelap, garis emas (cocok untuk gala) */
+.theme-noir-gold { --on-primary: #1a1405; --radius: 2px; }
+.theme-noir-gold h1, .theme-noir-gold h2, .theme-noir-gold h3 { letter-spacing: .08em; text-transform: uppercase; font-weight: 500; }
+.theme-noir-gold h1 { font-size: clamp(1.9rem, 8vw, 2.6rem); }
+.theme-noir-gold .card, .theme-noir-gold .event-card { border-color: color-mix(in srgb, var(--primary) 55%, transparent); background: rgba(255,255,255,.03); }
+.theme-noir-gold .sec { border-top: 1px solid color-mix(in srgb, var(--primary) 35%, transparent); }
+.theme-noir-gold .sec:nth-of-type(even) { background: #151517; }
+.theme-noir-gold .btn { border-radius: 0; letter-spacing: .18em; text-transform: uppercase; font-size: .75rem; }
+.theme-noir-gold .host-photo { border-radius: 0; border: 1px solid var(--primary); padding: 6px; background: var(--bg); box-shadow: none; }
+.theme-noir-gold .countdown div { border-radius: 0; background: transparent; color: var(--primary); border: 1px solid var(--primary); }
+.theme-noir-gold .guest-box { border-radius: 0; border-color: var(--primary); }
+.theme-noir-gold .cover { background: linear-gradient(rgba(0,0,0,.45), rgba(0,0,0,.85)), var(--cover-img, none) center/cover, radial-gradient(circle at 50% 30%, #3a2d0c, #0e0e10 70%); }
+.theme-noir-gold .cover .btn.primary { background: var(--primary); color: #1a1405; border-color: var(--primary); }
+
+/* Confetti Pop — ceria, warna cerah, konfeti */
+.theme-confetti-pop { --radius: 26px; }
+.theme-confetti-pop .cover { background:
+  radial-gradient(circle at 12% 18%, var(--accent) 0 9px, transparent 10px),
+  radial-gradient(circle at 82% 12%, #4cc9f0 0 7px, transparent 8px),
+  radial-gradient(circle at 70% 78%, var(--accent) 0 11px, transparent 12px),
+  radial-gradient(circle at 20% 84%, #4cc9f0 0 8px, transparent 9px),
+  linear-gradient(rgba(0,0,0,.18), rgba(0,0,0,.42)), var(--cover-img, none) center/cover,
+  linear-gradient(160deg, var(--primary), #ff9a3c); }
+.theme-confetti-pop h1 { font-weight: 700; }
+.theme-confetti-pop .btn { font-weight: 700; box-shadow: 0 4px 0 color-mix(in srgb, var(--primary) 60%, #000); }
+.theme-confetti-pop .btn:hover { transform: translateY(2px); box-shadow: 0 2px 0 color-mix(in srgb, var(--primary) 60%, #000); }
+.theme-confetti-pop .event-card, .theme-confetti-pop .card { border: 3px solid var(--text); box-shadow: 6px 6px 0 var(--accent); }
+.theme-confetti-pop .countdown div { transform: rotate(-2deg); } .theme-confetti-pop .countdown div:nth-child(even) { transform: rotate(2deg); background: var(--accent); color: var(--text); }
+.theme-confetti-pop .host-photo { border-radius: 50%; width: 200px; height: 200px; border: 5px solid var(--accent); }
+
+/* Midnight Royal — biru malam & emas */
+.theme-midnight-royal { --on-primary: #101a38; }
+.theme-midnight-royal .cover { background: linear-gradient(rgba(10,18,50,.5), rgba(10,18,50,.85)), var(--cover-img, none) center/cover, radial-gradient(ellipse at 50% 0%, #2c3f8a, #0f1b3d 70%); }
+.theme-midnight-royal .sec:nth-of-type(even) { background: #14235a; }
+.theme-midnight-royal .card, .theme-midnight-royal .event-card { background: rgba(255,255,255,.05); border-color: color-mix(in srgb, var(--primary) 35%, transparent); }
+.theme-midnight-royal .cover .btn.primary { background: var(--primary); color: #101a38; border-color: var(--primary); }
+.theme-midnight-royal .orn { color: var(--primary); }
+
+/* Terracotta Boho — hangat, lengkungan */
+.theme-terracotta-boho h1, .theme-terracotta-boho h2 { font-weight: 600; }
+.theme-terracotta-boho .host-photo { border-radius: 120px 120px 0 0; border: 0; box-shadow: 0 0 0 6px var(--accent); }
+.theme-terracotta-boho .cover { background: linear-gradient(rgba(80,35,20,.35), rgba(80,35,20,.65)), var(--cover-img, none) center/cover, linear-gradient(160deg, var(--primary), #d98b5f); }
+.theme-terracotta-boho .event-card { border-radius: 120px 120px 18px 18px; padding-top: 2.4rem; }
+
+/* Neon Night — ungu gelap, tepi bercahaya */
+.theme-neon-night { --on-primary: #12062a; }
+.theme-neon-night .cover { background: linear-gradient(rgba(18,10,36,.55), rgba(18,10,36,.9)), var(--cover-img, none) center/cover, radial-gradient(circle at 20% 20%, #5b2a9e, transparent 55%), radial-gradient(circle at 85% 80%, #0d6f78, transparent 50%), #120a24; }
+.theme-neon-night h1, .theme-neon-night h2 { text-shadow: 0 0 18px color-mix(in srgb, var(--primary) 70%, transparent); letter-spacing: .02em; }
+.theme-neon-night .card, .theme-neon-night .event-card { background: rgba(255,255,255,.04); border-color: var(--primary); box-shadow: 0 0 22px color-mix(in srgb, var(--primary) 35%, transparent); }
+.theme-neon-night .sec:nth-of-type(even) { background: #1a1033; }
+.theme-neon-night .btn.primary { box-shadow: 0 0 18px color-mix(in srgb, var(--primary) 60%, transparent); }
+.theme-neon-night .countdown div { background: transparent; border: 1px solid var(--accent); color: var(--accent); box-shadow: inset 0 0 14px color-mix(in srgb, var(--accent) 25%, transparent); }
+.theme-neon-night .cover .btn.primary { background: var(--primary); color: #12062a; border-color: var(--primary); }

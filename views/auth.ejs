@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title><%= mode === 'login' ? 'Masuk' : 'Daftar' %> — Undangan Digital</title>
+  <link rel="stylesheet" href="<%= basePath %>/css/app.css">
+</head>
+<body class="auth-page">
+  <main class="auth-card">
+    <a class="brand-logo" href="<%= basePath %>/">✉ Undangan Digital</a>
+    <h1><%= mode === 'login' ? 'Masuk ke akun' : 'Buat akun baru' %></h1>
+    <form id="auth-form" data-mode="<%= mode %>" novalidate>
+      <% if (mode === 'register') { %>
+        <label>Nama<input type="text" name="name" autocomplete="name" required maxlength="120"></label>
+      <% } %>
+      <label>Email<input type="email" name="email" autocomplete="email" required maxlength="190"></label>
+      <label>Kata sandi<input type="password" name="password" autocomplete="<%= mode === 'login' ? 'current-password' : 'new-password' %>" required minlength="8" maxlength="72"></label>
+      <button class="btn primary big" type="submit"><%= mode === 'login' ? 'Masuk' : 'Daftar' %></button>
+      <p class="form-msg" role="alert"></p>
+    </form>
+    <p class="alt">
+      <% if (mode === 'login') { %>Belum punya akun? <a href="<%= basePath %>/register">Daftar</a><% } else { %>Sudah punya akun? <a href="<%= basePath %>/login">Masuk</a><% } %>
+    </p>
+  </main>
+  <script>window.__BASE_PATH__ = "<%= basePath %>";</script>
+  <script src="<%= basePath %>/js/auth.js"></script>
+</body>
+</html>
