@@ -1,17 +1,33 @@
-# PostgreSQL untuk pengembangan lokal:  docker compose up -d
-# Lalu: cp .env.example .env && npm install && npm run migrate && npm start
 services:
   db:
     image: postgres:16-alpine
+    container_name: undangan-db
     restart: unless-stopped
     environment:
-      POSTGRES_USER: undangan
-      POSTGRES_PASSWORD: undangan123
-      POSTGRES_DB: undangan_digital
+      POSTGRES_USER: ${POSTGRES_USER:-undangan}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-undanganuika2026}
+      POSTGRES_DB: ${POSTGRES_DB:-undangan_digital}
     ports:
-      - "5433:5432"
+      - "${DB_PORT:-5432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+
+  app:
+    build: .
+    container_name: undangan-app
+    restart: unless-stopped
+    depends_on:
+      - db
+    environment:
+      PORT: 3006
+      DATABASE_URL: postgres://${POSTGRES_USER:-undangan}:${POSTGRES_PASSWORD:-undanganuika2026}@db:5432/${POSTGRES_DB:-undangan_digital}
+      JWT_SECRET: ${JWT_SECRET:-undangan-digital-jwt-secret-uika-2026-minimal-32-karakter}
+      BASE_URL: ${BASE_URL:-https://utility.uika-bogor.ac.id/undangan-digital}
+      NODE_ENV: production
+    ports:
+      - "3006:3006"
+    volumes:
+      - ./public/uploads:/app/public/uploads
 
 volumes:
   pgdata:
