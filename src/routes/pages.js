@@ -5,6 +5,7 @@ const cfg = require('../config');
 const { requirePage } = require('../auth');
 const { EVENT_TYPES, THEMES, PALETTES, FONTS, OPENERS, EFFECTS, AR_RUM_21 } = require('../lib/themes');
 const { buildView, safeJson } = require('../lib/render');
+const { buildTicket, qrSvg } = require('../lib/ticket');
 
 const router = express.Router();
 
@@ -50,7 +51,31 @@ router.get('/preview/:id', requirePage, async (req, res, next) => {
   const versionId = (inv.versions || []).some((v) => v.id === req.query.version) ? req.query.version : '';
   const view = buildView(inv, { guest, preview: true, versionId, demo: req.query.demo === '1' });
   res.set('Cache-Control', 'no-store');
-  res.render('invitation', { ...view, safeJson });
+  const ticket = await buildTicket(inv, req.query.guest ? guest : null, req, { preview: true });
+  res.render('invitation', { ...view, ticket, safeJson });
+});
+
+// Cetak kartu QR semua tamu (atau satu grup) dan poster QR acara.
+router.get('/print/:id/cards', requirePage, async (req, res, next) => {
+  const inv = await ownedInvitation(req);
+  if (!inv) return next();
+  const r = await query('SELECT * FROM guests WHERE invitation_id = $1 ORDER BY name, id LIMIT 2000', [inv.id]);
+  const vname = new Map((inv.versions || []).map((v) => [v.id, v.name]));
+  const cards = [];
+  for (const g of r.rows) {
+    cards.push({ name: g.name, group_name: g.group_name, table_name: g.table_name, version: vname.get(g.version_id) || '', code: g.code, svg: await qrSvg(inv, g.code) });
+  }
+  res.set('Cache-Control', 'no-store');
+  res.render('print-cards', { inv, cards });
+});
+
+router.get('/print/:id/poster', requirePage, async (req, res, next) => {
+  const inv = await ownedInvitation(req);
+  if (!inv) return next();
+  const url = `${cfg.baseUrl}/${inv.slug}/foto`;
+  const svg = await require('qrcode').toString(url, { type: 'svg', margin: 1, width: 400 });
+  res.set('Cache-Control', 'no-store');
+  res.render('print-poster', { inv, svg, url });
 });
 
 module.exports = router;

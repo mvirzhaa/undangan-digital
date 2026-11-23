@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="robots" content="noindex,nofollow">
+  <meta name="theme-color" content="#14161c">
+  <meta name="base-path" content="<%= basePath %>">
+  <title>Pemindai — <%= title %></title>
+  <link rel="stylesheet" href="<%= basePath %>/css/scan.css">
+</head>
+<body class="scan">
+<header class="sc-top">
+  <div><small>Pemindai petugas</small><strong id="sc-title"></strong></div>
+  <div class="sc-stats" id="sc-stats" aria-live="polite"></div>
+</header>
+
+<nav class="sc-tabs" id="sc-tabs" role="tablist">
+  <button type="button" role="tab" data-station="guestbook" class="active">📒 Buku tamu</button>
+  <button type="button" role="tab" data-station="booth" id="tab-booth" hidden>📸 Photobooth</button>
+</nav>
+
+<main class="sc-main">
+  <section class="sc-cam">
+    <div class="sc-video" id="sc-video-wrap">
+      <video id="sc-video" playsinline muted></video>
+      <div class="sc-frame" aria-hidden="true"></div>
+      <div class="sc-off" id="sc-off"><p id="sc-off-text">Kamera belum aktif</p></div>
+    </div>
+    <div class="sc-row">
+      <button type="button" class="sc-btn primary" id="sc-start">Aktifkan kamera</button>
+      <button type="button" class="sc-btn" id="sc-flip" hidden>Putar kamera</button>
+    </div>
+    <p class="sc-hint" id="sc-cam-hint"></p>
+  </section>
+
+  <section class="sc-panel">
+    <div class="sc-result" id="sc-result" role="status" aria-live="assertive">
+      <p class="muted">Arahkan kamera ke QR tamu, atau ketik kode / cari nama di bawah.</p>
+    </div>
+
+    <form id="sc-form" class="sc-form" autocomplete="off">
+      <input id="sc-code" placeholder="Kode tamu / isi QR (pemindai USB juga bisa)" autocapitalize="off" spellcheck="false" aria-label="Kode tamu">
+      <button class="sc-btn primary" type="submit">Catat</button>
+    </form>
+
+    <div class="sc-search">
+      <input id="sc-q" type="search" placeholder="Cari nama tamu (tanpa QR)…" aria-label="Cari nama tamu" autocomplete="off">
+      <div id="sc-found" class="sc-found"></div>
+    </div>
+
+    <section class="sc-booth" id="sc-booth" hidden>
+      <h3>Foto sesi photobooth</h3>
+      <p class="muted" id="sc-booth-who">Pindai QR tamu lebih dulu, lalu unggah foto hasil sesi.</p>
+      <label class="sc-btn" id="sc-upl-label">Unggah foto<input type="file" id="sc-upl" accept="image/jpeg,image/png,image/webp" multiple hidden></label>
+      <p class="sc-hint" id="sc-upl-msg" role="status"></p>
+      <div class="sc-thumbs" id="sc-thumbs"></div>
+    </section>
+
+    <section class="sc-recent">
+      <h3>Pemindaian terakhir</h3>
+      <ul id="sc-recent"></ul>
+    </section>
+  </section>
+</main>
+
+<script type="application/json" id="sc-boot"><%- boot %></script>
+<script src="<%= basePath %>/vendor/jsqr.js"></script>
+<script src="<%= basePath %>/js/scan.js"></script>
+</body>
+</html>

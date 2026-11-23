@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <title>Kartu QR tamu — <%= inv.title %></title>
+  <link rel="stylesheet" href="<%= basePath %>/css/print.css">
+</head>
+<body>
+<div class="bar">
+  <strong>Kartu QR tamu · <%= cards.length %> kartu</strong>
+  <span class="muted">Cetak (atau simpan sebagai PDF) lalu berikan ke tamu. Satu QR hanya bisa dipindai sekali.</span>
+  <button type="button" id="print-btn">Cetak</button>
+</div>
+<main class="cards">
+  <% cards.forEach(function (c) { %>
+  <article class="card">
+    <small><%= inv.title %></small>
+    <div class="qr"><%- c.svg %></div>
+    <strong><%= c.name %></strong>
+    <span><%= [c.group_name, c.table_name, c.version].filter(Boolean).join(' · ') %></span>
+    <code><%= c.code %></code>
+  </article>
+  <% }) %>
+</main>
+<script src="<%= basePath %>/js/print.js"></script>
+</body>
+</html>

@@ -1,5 +1,6 @@
 // Isi awal undangan menurut jenis acara.
 const { EVENT_TYPES, AR_RUM_21, getTheme } = require('./themes');
+const { attendanceCfg } = require('./attcfg');
 
 function isoDateInDays(days) {
   const d = new Date(Date.now() + days * 86400000);
@@ -24,6 +25,7 @@ function defaultSettings(type = 'other') {
     lang: 'id',
     privateMode: false,
     musicAutoplay: true,
+    attendance: attendanceCfg({}), // photobooth & unggah swafoto mati sampai dinyalakan penyelenggara
     opener: '', // kosong = ikuti template; 'none' = tanpa animasi
     fx: '',     // kosong = ikuti template; 'none' = tanpa efek
     waTemplate:

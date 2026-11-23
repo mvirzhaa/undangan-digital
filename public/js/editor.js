@@ -3,12 +3,9 @@
   'use strict';
 
   var boot = JSON.parse(document.getElementById('boot').textContent);
-  var metaTag = document.querySelector('meta[name="base-path"]');
-  var basePath = (boot && boot.basePath) ||
-    (metaTag && metaTag.content) ||
-    (location.pathname.startsWith('/undangan-digital') ? '/undangan-digital' : '') ||
-    '';
   var meta = boot.meta;
+  var metaTag = document.querySelector('meta[name="base-path"]');
+  var basePath = (boot && boot.basePath) || (metaTag && metaTag.content) || (location.pathname.startsWith('/undangan-digital') ? '/undangan-digital' : '') || '';
   var inv = boot.invitation;               // objek ini menjadi "state" yang diedit
   var API = basePath + '/api/invitations/' + inv.id;
   var $ = function (s, r) { return (r || document).querySelector(s); };
@@ -25,6 +22,7 @@
     t[last] = val;
   }
   function api(method, url, body) {
+    if (basePath && url.startsWith('/') && !url.startsWith(basePath)) url = basePath + url;
     var opts = { method: method, headers: {} };
     if (body !== undefined) { opts.headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(body); }
     return fetch(url, opts).then(function (r) {
@@ -65,7 +63,7 @@
 
   // ---------- pratinjau ----------
   var frame = $('#preview');
-  var ANCHOR = { cover: 'cover', opening: 'opening', profile: 'hosts', family: 'family', detail: 'events', program: 'program', lineup: 'lineup', story: 'story', gallery: 'gallery', extra: 'dresscode', gift: 'gifts', info: 'info', partners: 'partners', music: 'cover', guest: 'rsvp', rsvp: 'rsvp', wishes: 'wishes', preset: 'cover', anim: 'cover', color: 'cover', font: 'cover' };
+  var ANCHOR = { cover: 'cover', opening: 'opening', profile: 'hosts', family: 'family', detail: 'events', program: 'program', lineup: 'lineup', story: 'story', gallery: 'gallery', extra: 'dresscode', gift: 'gifts', info: 'info', partners: 'partners', music: 'cover', guest: 'rsvp', rsvp: 'rsvp', wishes: 'wishes', preset: 'cover', anim: 'cover', color: 'cover', font: 'cover', checkin: 'ticket', attend: 'ticket', photos: 'ticket', booth: 'ticket' };
   var pvVersion = ''; var pvDemo = false; var lastPv = '';
   function pvUrl(anchor) { return basePath + '/preview/' + inv.id + '?' + (pvDemo ? 'demo=1' : 'open=1') + (pvVersion ? '&version=' + pvVersion : '') + (anchor ? '#' + anchor : ''); }
   function reloadPreview() {
@@ -140,6 +138,14 @@
   function allows(sec) { return typeInfo.sections.indexOf(sec) >= 0; }
   function rid() { return 'v' + Math.random().toString(36).slice(2, 8).padEnd(6, '0'); }
   inv.versions = inv.versions || [];
+  inv.settings.attendance = Object.assign({ photobooth: false, selfie: false, galleryAccess: 'contributors', boothShare: 'own' }, inv.settings.attendance || {});
+  function att() { return inv.settings.attendance; }
+  function guestForms() {
+    var f = [['guest', 'Daftar tamu'], ['rsvp', 'Kehadiran (RSVP)'], ['checkin', 'Buku tamu / check-in'], ['attend', 'Presensi & QR'], ['photos', 'Galeri kegiatan']];
+    if (att().photobooth) f.push(['booth', 'Galeri photobooth']);
+    f.push(['wishes', 'Ucapan & doa']);
+    return f;
+  }
 
   // ---------- menu ----------
   function menuTree() {
@@ -148,7 +154,7 @@
       { key: 'theme', label: 'Tampilan', forms: [['preset', 'Template'], ['anim', 'Animasi pembuka'], ['color', 'Warna'], ['font', 'Jenis tulisan']] },
       { key: 'data', label: 'Isi undangan', forms: typeInfo.menu },
       { key: 'version', label: 'Versi undangan', forms: [['list', 'Versi undangan']] },
-      { key: 'guest', label: 'Tamu', forms: [['guest', 'Daftar tamu'], ['rsvp', 'Kehadiran (RSVP)'], ['checkin', 'Buku tamu / check-in'], ['wishes', 'Ucapan & doa']] },
+      { key: 'guest', label: 'Tamu', forms: guestForms() },
       { key: 'setting', label: 'Pengaturan', forms: [['general', 'Umum'], ['sections', 'Bagian & privasi'], ['rsvpset', 'RSVP & ucapan'], ['danger', 'Lanjutan']] },
     ];
   }
@@ -199,7 +205,7 @@
     var done = steps.filter(function (s) { return s[1]; }).length;
     var html = '<div class="hero-card"><div class="ring">' + esc(typeInfo.label) + '</div><h2>' + esc(inv.title) + '</h2>' +
       '<div class="link-row"><code id="share-link">' + esc(inviteUrl()) + '</code><button type="button" class="btn small" data-action="copy-link">Salin</button>' +
-      '<a class="btn small" target="_blank" rel="noopener" href="' + (inv.status === 'published' ? (basePath + '/' + esc(inv.slug)) : (basePath + '/preview/' + inv.id)) + '">Buka ↗</a></div>' +
+      '<a class="btn small" target="_blank" rel="noopener" href="' + (inv.status === 'published' ? basePath + '/' + esc(inv.slug) : basePath + '/preview/' + inv.id) + '">Buka ↗</a></div>' +
       '<div class="hero-actions"><button type="button" class="btn small" data-action="share">Bagikan undangan</button><button type="button" class="btn small" data-go="theme/preset">Ganti template</button></div></div>';
     html += '<div class="banner ' + (inv.status === 'published' ? 'ok' : 'warn') + '"><div><strong>' + (inv.status === 'published' ? 'Undangan sudah aktif' : 'Undangan belum aktif') + '</strong><p>' +
       (inv.status === 'published' ? 'Siapa pun yang punya link bisa membukanya' + (inv.settings.privateMode ? ' (mode privat: hanya lewat link tamu).' : '.') : 'Hanya Anda yang bisa melihatnya lewat pratinjau. Aktifkan bila sudah siap dibagikan.') +
@@ -208,7 +214,7 @@
       steps.map(function (s) { return '<li class="' + (s[1] ? 'done' : '') + '"><button type="button" data-go="' + s[2] + '/' + s[3] + '"><span class="tick">' + (s[1] ? '✓' : '') + '</span>' + esc(s[0]) + '<i>›</i></button></li>'; }).join('') + '</ul>');
     html += '<div id="stats-box"></div>';
     html += card('Menu cepat', '<div class="quick">' +
-      [['Template', 'theme/preset'], ['Animasi', 'theme/anim'], ['Versi VIP', 'version/list'], ['Tamu', 'guest/guest'], ['RSVP', 'guest/rsvp'], ['Check-in', 'guest/checkin'], ['Ucapan', 'guest/wishes']].map(function (q) {
+      [['Template', 'theme/preset'], ['Animasi', 'theme/anim'], ['Versi VIP', 'version/list'], ['Tamu', 'guest/guest'], ['RSVP', 'guest/rsvp'], ['Check-in', 'guest/checkin'], ['Presensi & QR', 'guest/attend'], ['Galeri', 'guest/photos'], ['Ucapan', 'guest/wishes']].map(function (q) {
         return '<button type="button" class="btn" data-go="' + q[1] + '">' + q[0] + '</button>';
       }).join('') + '</div>');
     return { html: html, after: loadStats };
@@ -218,7 +224,7 @@
       var box = $('#stats-box'); if (!box) return;
       box.innerHTML = card('Statistik undangan', '<div class="stats">' +
         stat(s.rsvp.hadir.pax, 'Tamu konfirmasi hadir', s.rsvp.hadir.n + ' jawaban') + stat(s.wishes.total, 'Doa & ucapan', s.wishes.pending ? s.wishes.pending + ' menunggu' : '') +
-        stat(s.guests.total, 'Daftar tamu', s.guests.opened + ' sudah membuka') + stat(s.guests.checked_in, 'Check-in', s.guests.checked_in_pax + ' orang') + stat(s.views, 'Dilihat', '') + '</div>');
+        stat(s.guests.total, 'Daftar tamu', s.guests.opened + ' sudah membuka') + stat(s.guests.checked_in, 'Check-in', s.guests.checked_in_pax + ' orang') + (att().photobooth ? stat(s.attendance.booth, 'Sesi photobooth', s.attendance.photos.booth + ' foto') : '') + (att().selfie || s.attendance.photos.selfie ? stat(s.attendance.photos.selfie, 'Foto galeri kegiatan', '') : '') + stat(s.views, 'Dilihat', '') + '</div>');
     }).catch(function () {});
   }
   function stat(n, label, sub) { return '<div class="stat"><b>' + n + '</b><span>' + esc(label) + '</span>' + (sub ? '<small class="muted">' + esc(sub) + '</small>' : '') + '</div>'; }
@@ -461,6 +467,7 @@
       '<div class="table-wrap"><table class="tbl"><thead><tr><th><input type="checkbox" id="sel-all" aria-label="Pilih semua"></th><th>Nama</th><th>Grup</th><th>Jumlah</th><th>Versi</th><th>Status</th><th></th></tr></thead><tbody>' +
       list.map(function (g) {
         var st = g.checked_in_at ? '<span class="pill ok">Check-in</span>' : g.attendance === 'hadir' ? '<span class="pill ok">Hadir</span>' : g.attendance === 'tidak' ? '<span class="pill no">Tidak hadir</span>' : g.attendance === 'ragu' ? '<span class="pill">Belum pasti</span>' : g.opened_at ? '<span class="pill">Dibuka</span>' : '<span class="pill mute">Belum</span>';
+        if (g.booth_at) st += ' <span class="pill vip">Booth</span>';
         return '<tr><td><input type="checkbox" data-sel="' + g.id + '"' + (selGuests[g.id] ? ' checked' : '') + ' aria-label="Pilih ' + esc(g.name) + '"></td><td><strong>' + esc(g.name) + '</strong><br><small class="muted">' + esc(g.phone) + '</small></td><td>' + esc(g.group_name) + '</td><td>' + g.pax_limit + '</td>' +
           '<td>' + (g.version_id ? '<span class="pill vip">' + esc(verName(g.version_id)) + '</span>' : '<span class="muted">Standar</span>') + '</td><td>' + st + '</td>' +
           '<td class="acts"><button type="button" class="btn tiny" data-action="guest-copy" data-id="' + g.id + '">Salin link</button>' +
@@ -533,8 +540,11 @@
 
   // Tamu: check-in
   PAGES['guest/checkin'] = function () {
-    return { html: pageHead('Buku tamu / check-in', 'Catat kedatangan tamu di hari acara. Masukkan kode tamu atau pindai QR dengan pemindai yang mengetik ke kolom ini.') +
-      card('Check-in', '<form id="ci-form" class="row"><input id="ci-code" class="grow" placeholder="Kode tamu atau isi QR (link undangan)…" autocomplete="off" autofocus><input id="ci-pax" type="number" min="1" max="50" placeholder="Jumlah" class="num"><button class="btn primary" type="submit">Check-in</button></form><p class="form-msg" id="ci-msg" role="status"></p>') +
+    var boothOn = att().photobooth;
+    return { html: pageHead('Buku tamu / check-in', 'Kehadiran tamu tercatat otomatis saat QR-nya dipindai petugas. Halaman ini untuk mencatat manual dan melihat yang sudah hadir.') +
+      card('Pemindai petugas', '<p class="muted">Buka pemindai di ponsel/tablet petugas untuk memindai QR tamu dengan kamera. Satu QR hanya bisa dipindai satu kali.</p><div class="toolbar"><a class="btn small primary" target="_blank" rel="noopener" href="' + basePath + '/scan/' + esc(inv.staff_token) + '">Buka pemindai ↗</a><button type="button" class="btn small" data-go="guest/attend">Atur QR & tautan petugas</button></div>') +
+      card('Catat manual', '<form id="ci-form" class="row">' + (boothOn ? '<select id="ci-station" aria-label="Pos"><option value="guestbook">Buku tamu</option><option value="booth">Photobooth</option></select>' : '') +
+        '<input id="ci-code" class="grow" placeholder="Kode tamu atau isi QR (link undangan)…" autocomplete="off" autofocus><input id="ci-pax" type="number" min="1" max="50" placeholder="Jumlah" class="num"><button class="btn primary" type="submit">Catat</button></form><p class="form-msg" id="ci-msg" role="status"></p>') +
       '<div id="ci-list"></div>', after: loadCheckins };
   };
   function loadCheckins() {
@@ -542,11 +552,72 @@
       guestCache = j.guests; var box = $('#ci-list'); if (!box) return;
       var done = j.guests.filter(function (g) { return g.checked_in_at; }).sort(function (a, b) { return new Date(b.checked_in_at) - new Date(a.checked_in_at); });
       var total = done.reduce(function (n, g) { return n + (g.checked_in_pax || 0); }, 0);
-      box.innerHTML = card('Sudah hadir: ' + done.length + ' tamu · ' + total + ' orang',
+      box.innerHTML = card('Buku tamu — hadir: ' + done.length + ' dari ' + j.guests.length + ' tamu · ' + total + ' orang',
         done.length ? '<table class="tbl"><tbody>' + done.map(function (g) {
           return '<tr><td><strong>' + esc(g.name) + '</strong><br><small class="muted">kode ' + esc(g.code) + (g.table_name ? ' · ' + esc(g.table_name) : '') + '</small></td><td>' + g.checked_in_pax + ' orang</td><td><small>' + fmtTime(g.checked_in_at) + '</small></td><td><button type="button" class="btn tiny" data-action="ci-undo" data-id="' + g.id + '">Batalkan</button></td></tr>';
         }).join('') + '</tbody></table>' : '<p class="muted">Belum ada yang check-in.</p>');
+      if (att().photobooth) {
+        var bt = j.guests.filter(function (g) { return g.booth_at; }).sort(function (a, b) { return new Date(b.booth_at) - new Date(a.booth_at); });
+        box.innerHTML += card('Photobooth — sesi: ' + bt.length + ' tamu',
+          bt.length ? '<table class="tbl"><tbody>' + bt.map(function (g) {
+            return '<tr><td><strong>' + esc(g.name) + '</strong></td><td><small>' + fmtTime(g.booth_at) + '</small></td><td><button type="button" class="btn tiny" data-action="booth-undo" data-id="' + g.id + '">Batalkan</button></td></tr>';
+          }).join('') + '</tbody></table>' : '<p class="muted">Belum ada sesi photobooth.</p>');
+      }
     });
+  }
+
+  // Tamu: presensi QR, pemindai, swafoto, photobooth (pengaturan)
+  PAGES['guest/attend'] = function () {
+    var a = att(); var staffUrl = (boot.baseUrl || (origin + basePath)) + '/scan/' + inv.staff_token; var eventUrl = (boot.baseUrl || (origin + basePath)) + '/' + inv.slug + '/foto';
+    var html = pageHead('Presensi & galeri kegiatan', 'Atur QR tamu, pemindai petugas, swafoto tamu, dan photobooth untuk acara ini.') +
+      (inv.status !== 'published' ? '<div class="banner warn"><div><strong>Undangan belum aktif</strong><p>Tiket QR di link tamu, halaman swafoto, dan galeri baru bisa dibuka tamu setelah undangan diaktifkan. Pemindai petugas sudah bisa dipakai.</p></div></div>' : '') +
+      card('1 · QR pribadi tiap tamu', '<p class="muted">Setiap tamu punya QR sendiri di bagian “Tiket Masuk” pada link undangannya. Petugas memindainya di pintu masuk dan tamu langsung tercatat hadir di buku tamu. <strong>Satu QR hanya dapat dipindai satu kali</strong> untuk buku tamu' + (a.photobooth ? ' dan satu kali untuk photobooth' : '') + '.</p>' +
+        '<div class="toolbar"><a class="btn small primary" target="_blank" rel="noopener" href="' + basePath + '/print/' + inv.id + '/cards">Cetak kartu QR semua tamu</a><button type="button" class="btn small" data-go="guest/guest">Kelola daftar tamu</button></div>') +
+      card('2 · Pemindai petugas', '<p class="muted">Tautan ini membuka pemindai kamera untuk petugas tanpa perlu masuk akun. Bagikan hanya kepada petugas: siapa pun yang punya tautannya dapat mencatat kehadiran' + (a.photobooth ? ' dan mengunggah foto photobooth' : '') + '.</p>' +
+        '<div class="link-row"><code>' + esc(staffUrl) + '</code></div><div class="toolbar"><button type="button" class="btn small" data-action="copy-text" data-text="' + esc(staffUrl) + '">Salin tautan</button><a class="btn small primary" target="_blank" rel="noopener" href="' + basePath + '/scan/' + esc(inv.staff_token) + '">Buka pemindai ↗</a><a class="btn small" target="_blank" rel="noopener" href="https://wa.me/?text=' + encodeURIComponent('Pemindai tamu: ' + staffUrl) + '">Kirim lewat WhatsApp</a><button type="button" class="btn small danger" data-action="staff-regen">Buat kunci baru</button></div>' +
+        '<p class="muted">Kamera ponsel hanya bisa dipakai bila alamat situs memakai HTTPS. Tanpa HTTPS, petugas tetap bisa memakai kolom kode atau pemindai USB.</p>') +
+      card('3 · Photobooth', toggle('settings.attendance.photobooth', 'Ada photobooth di acara ini', 'Bila dicentang, QR tamu berlaku juga sebagai penanda hadir di pos photobooth (juga hanya sekali pindai) dan galeri khusus photobooth tersedia.') +
+        (a.photobooth ? field('settings.attendance.boothShare', 'Siapa yang boleh melihat foto photobooth', { type: 'select', options: [['own', 'Tamu hanya melihat fotonya sendiri'], ['all', 'Semua tamu boleh melihat semua foto']] }) +
+          '<p class="muted">Foto diunggah fotografer/operator lewat pemindai (tab Photobooth), lewat menu <button type="button" class="linkbtn" data-go="guest/booth">Galeri photobooth</button>, atau otomatis dari mesin:</p><pre class="code">curl -X POST -F "photos=@foto1.jpg" -F "photos=@foto2.jpg" -F "code=KODE_TAMU" \\\n  ' + esc(boot.baseUrl || (origin + basePath)) + '/api/scan/' + esc(inv.staff_token) + '/photos</pre>' : '<p class="muted">Tidak dicentang: QR tamu hanya berfungsi sebagai penanda buku tamu.</p>')) +
+      card('4 · Swafoto tamu & galeri kegiatan', toggle('settings.attendance.selfie', 'Buka unggah swafoto lewat QR acara', 'Nyalakan saat acara berlangsung. Tamu memindai QR acara, berswafoto, dan fotonya masuk ke galeri kegiatan.') +
+        field('settings.attendance.galleryAccess', 'Siapa yang boleh melihat galeri kegiatan', { type: 'select', options: [['contributors', 'Hanya tamu yang ikut mengunggah foto'], ['guests', 'Semua tamu yang membuka link pribadinya'], ['public', 'Siapa pun yang punya tautan galeri']] }) +
+        '<div class="qr-box"><img src="' + API + '/event-qr.svg?v=' + encodeURIComponent(inv.slug) + '" alt="QR acara" width="180" height="180"><div><strong>QR acara</strong><p class="muted">Satu QR untuk semua tamu, mengarah ke halaman swafoto.</p><code>' + esc(eventUrl) + '</code>' +
+        '<div class="toolbar"><a class="btn small primary" target="_blank" rel="noopener" href="' + basePath + '/print/' + inv.id + '/poster">Cetak poster QR</a><a class="btn small" href="' + API + '/event-qr.svg" download="qr-acara.svg">Unduh QR</a><button type="button" class="btn small" data-action="copy-text" data-text="' + esc(eventUrl) + '">Salin tautan</button></div></div></div>' +
+        '<p class="muted">Tamu yang sudah ikut mengunggah melihat tombol “Lihat Galeri Kegiatan” di undangan pribadinya. Kelola foto di <button type="button" class="linkbtn" data-go="guest/photos">Galeri kegiatan</button>.</p>');
+    return { html: html };
+  };
+
+  // Tamu: galeri swafoto & photobooth
+  var selPhotos = {};
+  function photosPage(kind) {
+    var booth = kind === 'booth';
+    var up = booth ? card('Unggah foto photobooth', '<p class="muted">Pilih tamu pemilik sesi lalu unggah hasil foto (JPG/PNG/WebP, hingga 20 foto sekali unggah).</p><div class="row"><select id="bp-guest" class="grow" aria-label="Tamu"><option value="">(tanpa tamu / umum)</option></select>' +
+      '<label class="btn small primary">Pilih foto<input type="file" id="bp-files" accept="image/jpeg,image/png,image/webp" multiple hidden data-photo-upload="1"></label></div><p class="form-msg" id="bp-msg" role="status"></p>') : '';
+    return { html: pageHead(booth ? 'Galeri photobooth' : 'Galeri kegiatan', booth ? 'Semua foto sesi photobooth. Tamu melihat fotonya sendiri dari tombol di undangan pribadinya.' : 'Swafoto yang diunggah tamu lewat QR acara.') +
+      (!booth && !att().selfie ? '<div class="banner warn"><div><strong>Unggah swafoto belum dibuka</strong><p>Nyalakan di Presensi & QR agar tamu bisa mengunggah.</p></div><button type="button" class="btn small primary" data-go="guest/attend">Atur</button></div>' : '') +
+      up + '<div id="photo-area" data-kind="' + kind + '"><p class="muted">Memuat…</p></div>', after: function () {
+        selPhotos = {}; loadPhotos(kind);
+        if (booth) api('GET', API + '/guests').then(function (j) {
+          guestCache = j.guests; var sel = $('#bp-guest'); if (!sel) return;
+          sel.innerHTML += j.guests.map(function (g) { return '<option value="' + g.id + '">' + esc(g.name) + (g.booth_at ? ' ✓' : '') + '</option>'; }).join('');
+        });
+      } };
+  }
+  PAGES['guest/photos'] = function () { return photosPage('selfie'); };
+  PAGES['guest/booth'] = function () { return photosPage('booth'); };
+  function loadPhotos(kind) {
+    api('GET', API + '/photos?kind=' + kind).then(function (j) {
+      var box = $('#photo-area'); if (!box || box.dataset.kind !== kind) return;
+      var n = Object.keys(selPhotos).length;
+      box.innerHTML = '<div class="toolbar"><span class="muted">' + j.total + ' foto' + (j.total > j.photos.length ? ' (menampilkan ' + j.photos.length + ' terbaru)' : '') + '</span>' +
+        (j.total ? '<a class="btn small" href="' + API + '/photos.zip?kind=' + kind + '">Unduh semua (.zip)</a>' : '') +
+        (n ? '<button type="button" class="btn small danger" data-action="photo-bulk-del">Hapus ' + n + ' terpilih</button>' : '') + '</div>' +
+        (j.photos.length ? '<div class="pgrid">' + j.photos.map(function (p) {
+          var who = p.guest_name || p.uploader_name || '';
+          return '<div class="pcell"><input type="checkbox" data-psel="' + p.id + '"' + (selPhotos[p.id] ? ' checked' : '') + ' aria-label="Pilih foto"><a target="_blank" rel="noopener" href="/' + esc(inv.slug) + '/media/' + p.id + '"><img loading="lazy" alt="Foto ' + esc(who) + '" src="/' + esc(inv.slug) + '/media/' + p.id + '"></a>' +
+            '<small>' + esc(who || '—') + '</small><button type="button" class="x" data-action="photo-del" data-id="' + p.id + '" aria-label="Hapus foto">×</button></div>';
+        }).join('') + '</div>' : '<div class="empty"><h3>Belum ada foto</h3><p class="muted">' + (kind === 'booth' ? 'Unggah dari sini, dari pemindai petugas, atau dari mesin photobooth.' : 'Foto tamu akan muncul di sini.') + '</p></div>');
+    }).catch(function (e) { toast(e.message, true); });
   }
 
   // Tamu: ucapan
@@ -655,6 +726,7 @@
     var el = e.target; var path = el.dataset && el.dataset.path; if (!path) return;
     var val = el.hasAttribute('data-bool') ? el.checked : el.value;
     set(inv, path, val);
+    if (path === 'settings.attendance.photobooth') { renderSide(); markDirty(); rerender(); return; }
     if (path === 'slug') checkSlug(); else if (path === 'title') $('#ed-title').textContent = inv.title;
     markDirty();
   }
@@ -665,8 +737,8 @@
     clearTimeout(slugTimer);
     slugTimer = setTimeout(function () {
       var msg = $('#slug-msg'); if (!msg) return;
-      api('GET', basePath + '/api/slug-check?slug=' + encodeURIComponent(inv.slug) + '&except=' + inv.id).then(function (r) {
-        msg.textContent = r.available ? 'Tersedia: ' + (boot.baseUrl || (origin + basePath)) + '/' + r.slug : (r.reason || 'Tidak tersedia'); msg.className = r.available ? 'ok' : 'err';
+      api('GET', '/api/slug-check?slug=' + encodeURIComponent(inv.slug) + '&except=' + inv.id).then(function (r) {
+        msg.textContent = r.available ? 'Tersedia: ' + origin + '/' + r.slug : (r.reason || 'Tidak tersedia'); msg.className = r.available ? 'ok' : 'err';
       });
     }, 350);
   }
@@ -740,7 +812,19 @@
     else if (a === 'wish-toggle') api('PATCH', API + '/wishes/' + t.dataset.id, { approved: t.dataset.val === 'true' }).then(loadWishes);
     else if (a === 'wish-del') { if (confirm('Hapus ucapan ini?')) api('DELETE', API + '/wishes/' + t.dataset.id).then(loadWishes); }
     else if (a === 'ci-undo') api('DELETE', API + '/guests/' + t.dataset.id + '/checkin').then(loadCheckins);
-    else if (a === 'duplicate') api('POST', API + '/duplicate').then(function (j) { location.href = basePath + '/editor/' + j.id; }).catch(function (er) { toast(er.message, true); });
+    else if (a === 'booth-undo') api('DELETE', API + '/guests/' + t.dataset.id + '/booth').then(loadCheckins);
+    else if (a === 'copy-text') copy(t.dataset.text).then(function () { toast('Disalin'); });
+    else if (a === 'staff-regen') {
+      if (confirm('Buat kunci baru? Tautan pemindai yang lama langsung tidak berlaku dan harus dibagikan ulang ke petugas.')) {
+        api('POST', API + '/staff-token').then(function (j) { inv.staff_token = j.staff_token; toast('Kunci baru dibuat'); rerender(); }).catch(function (er) { toast(er.message, true); });
+      }
+    }
+    else if (a === 'photo-del') { if (confirm('Hapus foto ini?')) api('DELETE', API + '/photos/' + t.dataset.id).then(function () { delete selPhotos[t.dataset.id]; loadPhotos($('#photo-area').dataset.kind); }).catch(function (er) { toast(er.message, true); }); }
+    else if (a === 'photo-bulk-del') {
+      var ids = Object.keys(selPhotos);
+      if (ids.length && confirm('Hapus ' + ids.length + ' foto terpilih?')) api('POST', API + '/photos/bulk-delete', { ids: ids }).then(function (j) { selPhotos = {}; toast(j.affected + ' foto dihapus'); loadPhotos($('#photo-area').dataset.kind); }).catch(function (er) { toast(er.message, true); });
+    }
+    else if (a === 'duplicate') api('POST', API + '/duplicate').then(function (j) { location.href = '/editor/' + j.id; }).catch(function (er) { toast(er.message, true); });
     else if (a === 'delete-inv') {
       if (confirm('Hapus undangan "' + inv.title + '" beserta semua datanya? Tidak bisa dibatalkan.')) api('DELETE', API).then(function () { dirty = false; location.href = basePath + '/dashboard'; });
     }
@@ -751,6 +835,8 @@
     var el = e.target;
     if (el.id === 'guest-vf') { guestVer = el.value; drawGuests(); return; }
     if (el.id === 'sel-all') { selGuests = {}; if (el.checked) guestCache.forEach(function (g) { selGuests[g.id] = 1; }); drawGuests(); return; }
+    if (el.dataset && el.dataset.psel) { if (el.checked) selPhotos[el.dataset.psel] = 1; else delete selPhotos[el.dataset.psel]; loadPhotos($('#photo-area').dataset.kind); return; }
+    if (el.id === 'bp-files') { boothUpload(el); return; }
     if (el.dataset && el.dataset.sel) { if (el.checked) selGuests[el.dataset.sel] = 1; else delete selGuests[el.dataset.sel]; drawGuests(); return; }
     if (el.dataset && el.dataset.vevent) {
       var ve = el.dataset.vevent.split(':'); var vr = inv.versions[+ve[0]]; var k = +ve[1]; var at = vr.eventIdx.indexOf(k);
@@ -762,12 +848,32 @@
     if (e.target.id !== 'ci-form') return;
     e.preventDefault();
     var code = $('#ci-code').value; var pax = $('#ci-pax').value; var msg = $('#ci-msg');
-    api('POST', API + '/checkin', { code: code, pax: pax || undefined }).then(function (j) {
+    var station = ($('#ci-station') || {}).value || 'guestbook';
+    api('POST', API + '/checkin', { code: code, pax: pax || undefined, station: station }).then(function (j) {
       msg.className = 'form-msg ' + (j.already ? 'err' : 'ok');
-      msg.textContent = (j.already ? 'Sudah check-in sebelumnya: ' : 'Berhasil check-in: ') + j.guest.name + ' (' + (j.guest.checked_in_pax || j.guest.pax_limit) + ' orang)' + (j.guest.table_name ? ' · ' + j.guest.table_name : '');
+      var where = station === 'booth' ? 'photobooth' : 'buku tamu';
+      msg.textContent = j.already ? 'DITOLAK — QR ' + j.guest.name + ' sudah dipakai di ' + where + ' pada ' + fmtTime(j.at) + '. Satu QR hanya berlaku sekali.'
+        : 'Tercatat di ' + where + ': ' + j.guest.name + (station === 'booth' ? '' : ' (' + (j.guest.checked_in_pax || j.guest.pax_limit) + ' orang)') + (j.guest.table_name ? ' · ' + j.guest.table_name : '');
       $('#ci-code').value = ''; $('#ci-pax').value = ''; $('#ci-code').focus(); loadCheckins();
     }).catch(function (er) { msg.className = 'form-msg err'; msg.textContent = er.message; });
   });
+
+  function boothUpload(el) {
+    var files = Array.prototype.slice.call(el.files); el.value = '';
+    var msg = $('#bp-msg'); if (!files.length) return;
+    var gid = $('#bp-guest').value; var done = 0; var fail = '';
+    msg.className = 'form-msg'; msg.textContent = 'Mengunggah ' + files.length + ' foto…';
+    var chunks = []; for (var i = 0; i < files.length; i += 10) chunks.push(files.slice(i, i + 10));
+    chunks.reduce(function (p, ch) {
+      return p.then(function () {
+        var fd = new FormData(); ch.forEach(function (f) { fd.append('photos', f, f.name); }); if (gid) fd.append('guest_id', gid);
+        return fetch(API + '/photos', { method: 'POST', body: fd }).then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.error || 'Gagal mengunggah'); done += j.saved; }); });
+      });
+    }, Promise.resolve()).catch(function (er) { fail = er.message; }).then(function () {
+      msg.className = 'form-msg ' + (fail ? 'err' : 'ok'); msg.textContent = done + ' foto tersimpan' + (fail ? '. Gagal: ' + fail : '.');
+      loadPhotos('booth');
+    });
+  }
 
   // ---------- unggah ----------
   function upload(file, kind) {
@@ -776,7 +882,7 @@
       .then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.error || 'Gagal mengunggah'); return j.url; }); });
   }
   panel.addEventListener('change', function (e) {
-    var el = e.target; if (el.type !== 'file') return;
+    var el = e.target; if (el.type !== 'file' || el.dataset.photoUpload) return;
     var files = Array.prototype.slice.call(el.files); if (!files.length) return;
     toast('Mengunggah…');
     if (el.dataset.uploadPush) {
@@ -810,7 +916,7 @@
   function updatePublishBtn() {
     var b = $('#btn-publish'); b.textContent = inv.status === 'published' ? 'Nonaktifkan' : 'Aktifkan';
     b.classList.toggle('primary', inv.status !== 'published');
-    $('#pv-open').href = inv.status === 'published' ? (basePath + '/' + inv.slug) : (basePath + '/preview/' + inv.id);
+    $('#pv-open').href = inv.status === 'published' ? basePath + '/' + inv.slug : basePath + '/preview/' + inv.id;
   }
   $('#btn-publish').addEventListener('click', togglePublish);
 

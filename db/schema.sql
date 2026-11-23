@@ -75,3 +75,39 @@ ALTER TABLE guests ADD COLUMN IF NOT EXISTS version_id VARCHAR(30) NOT NULL DEFA
 -- Nama template lama -> baru (aman dijalankan berulang)
 UPDATE invitations SET theme = 'sage-garden' WHERE theme = 'sage-floral';
 UPDATE invitations SET theme = 'royal-book' WHERE theme = 'midnight-royal';
+
+-- ---- v3: presensi QR, photobooth, galeri kegiatan ----
+-- Kunci akses petugas (pemindai tanpa login) & mesin photobooth; bisa diganti pemilik.
+ALTER TABLE invitations ADD COLUMN IF NOT EXISTS staff_token VARCHAR(40) NOT NULL DEFAULT replace(gen_random_uuid()::text, '-', '');
+CREATE UNIQUE INDEX IF NOT EXISTS uq_invitations_staff_token ON invitations(staff_token);
+
+-- Waktu hadir di photobooth (check-in buku tamu memakai guests.checked_in_at).
+ALTER TABLE guests ADD COLUMN IF NOT EXISTS booth_at TIMESTAMPTZ;
+
+-- Catatan setiap pemindaian (termasuk percobaan ulang yang ditolak).
+CREATE TABLE IF NOT EXISTS scan_log (
+  id             SERIAL PRIMARY KEY,
+  invitation_id  INT NOT NULL REFERENCES invitations(id) ON DELETE CASCADE,
+  guest_id       INT REFERENCES guests(id) ON DELETE CASCADE,
+  station        VARCHAR(10) NOT NULL CHECK (station IN ('guestbook', 'booth')),
+  result         VARCHAR(10) NOT NULL CHECK (result IN ('ok', 'duplicate')),
+  source         VARCHAR(10) NOT NULL DEFAULT 'staff',
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_scan_log_invitation ON scan_log(invitation_id, created_at DESC);
+
+-- Foto galeri: 'selfie' = swafoto tamu lewat QR acara, 'booth' = foto photobooth.
+CREATE TABLE IF NOT EXISTS photos (
+  id             SERIAL PRIMARY KEY,
+  invitation_id  INT NOT NULL REFERENCES invitations(id) ON DELETE CASCADE,
+  kind           VARCHAR(8) NOT NULL CHECK (kind IN ('selfie', 'booth')),
+  guest_id       INT REFERENCES guests(id) ON DELETE SET NULL,
+  uploader_name  VARCHAR(160) NOT NULL DEFAULT '',
+  uploader_key   VARCHAR(40) NOT NULL DEFAULT '',
+  file           VARCHAR(80) NOT NULL,
+  mime           VARCHAR(20) NOT NULL,
+  bytes          INT NOT NULL DEFAULT 0,
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_photos_invitation ON photos(invitation_id, kind, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_photos_guest ON photos(guest_id);

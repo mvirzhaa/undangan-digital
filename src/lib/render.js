@@ -56,9 +56,22 @@ function buildFx(key) {
   });
 }
 
+// Variabel CSS & font untuk halaman pendukung (swafoto, galeri) agar senada dengan undangannya.
+function themeVars(inv) {
+  const base = getTheme(inv.theme);
+  const colors = { ...base.colors, ...(inv.colors || {}) };
+  const fonts = { ...base.fonts, ...(inv.fonts || {}) };
+  const cssVars = [
+    `--primary:${colors.primary}`, `--on-primary:${onColor(colors.primary)}`, `--accent:${colors.accent}`, `--bg:${colors.bg}`, `--text:${colors.text}`,
+    `--font-heading:'${fonts.heading}',serif`, `--font-body:'${fonts.body}',sans-serif`,
+  ].join(';');
+  const fontsUrl = `https://fonts.googleapis.com/css2?${gfont(fonts.heading)}:wght@400;600;700&${gfont(fonts.body)}:wght@300;400;500;600&display=swap`;
+  return { cssVars, fontsUrl };
+}
+
 function buildView(inv0, { guest = null, preview = false, versionId = '', demo = false } = {}) {
   const typeInfo = EVENT_TYPES[inv0.event_type] || EVENT_TYPES.other;
-  inv0 = { ...inv0, content: cleanContent(inv0.content), settings: inv0.settings || {}, versions: inv0.versions || [] };
+  inv0 = { ...inv0, staff_token: undefined, content: cleanContent(inv0.content), settings: inv0.settings || {}, versions: inv0.versions || [] };
   const vid = versionId || (guest && guest.version_id) || '';
   const { inv, version } = applyVersion(inv0, vid);
 
@@ -138,4 +151,4 @@ const safeJson = (o) => JSON.stringify(o)
   .replace(/\u2028/g, '\\u2028')
   .replace(/\u2029/g, '\\u2029');
 
-module.exports = { buildView, safeJson, OFFSET, findVersion };
+module.exports = { buildView, safeJson, OFFSET, findVersion, themeVars };

@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="<%= lang %>">
+<head>
+  <title>Foto Kegiatan — <%= inv.title %></title>
+  <%- include('partials/ev-head', { fontsUrl }) %>
+</head>
+<body class="ev" style="<%= cssVars %>">
+<main class="ev-wrap">
+  <header class="ev-head"><small>Galeri Kegiatan</small><h1><%= inv.title %></h1></header>
+
+  <% if (!a.selfie) { %>
+  <section class="card center">
+    <h2>Unggah foto belum dibuka</h2>
+    <p>Penyelenggara belum membuka unggah foto untuk acara ini. Coba lagi saat acara berlangsung.</p>
+    <% if (galleryOwner) { %><p class="muted">Anda pemilik undangan ini: nyalakan “Swafoto tamu” di editor › Tamu › Presensi &amp; galeri.</p><% } %>
+  </section>
+  <% } else { %>
+  <section class="card" id="shoot">
+    <h2>Abadikan momen ini</h2>
+    <p>Ambil swafoto atau pilih foto dari galeri ponsel. Foto Anda ikut melengkapi dokumentasi acara.</p>
+    <% if (data.knownGuest) { %>
+      <p class="hello">Halo, <strong><%= data.guestName %></strong> 👋</p>
+    <% } else { %>
+      <label class="f"><span>Nama Anda</span><input type="text" id="uname" maxlength="80" autocomplete="name" placeholder="Nama lengkap"></label>
+    <% } %>
+    <div class="shoot-actions">
+      <label class="btn primary big">📷 Ambil swafoto<input type="file" id="f-cam" accept="image/*" capture="user" hidden></label>
+      <label class="btn big">🖼 Pilih dari galeri<input type="file" id="f-pick" accept="image/*" multiple hidden></label>
+    </div>
+    <div id="queue" class="queue" aria-live="polite"></div>
+    <button type="button" id="send" class="btn primary big" hidden>Kirim foto</button>
+    <p id="msg" class="form-msg" role="status" aria-live="polite"></p>
+  </section>
+
+  <section class="card center" id="after" <% if (!(data.mine > 0 && data.hasGallery)) { %>hidden<% } %>>
+    <h2 id="after-title"><% if (data.mine > 0) { %>Terima kasih sudah berbagi!<% } else { %>Galeri kegiatan<% } %></h2>
+    <p class="muted" id="after-text"><% if (data.mine > 0) { %><span id="mine-n"><%= data.mine %></span> foto Anda sudah masuk galeri.<% } %></p>
+    <a class="btn primary" id="to-gallery" href="<%= basePath %>/<%= inv.slug %>/galeri<%= data.qs %>">Lihat galeri kegiatan</a>
+  </section>
+  <% } %>
+
+  <p class="ev-foot"><a href="<%= basePath %>/<%= inv.slug %><%= data.qs %>">← Kembali ke undangan</a></p>
+</main>
+<script type="application/json" id="ev-data"><%- safeJson(data) %></script>
+<script src="<%= basePath %>/js/selfie.js"></script>
+</body>
+</html>

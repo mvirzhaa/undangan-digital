@@ -19,7 +19,7 @@ const csp = {
     scriptSrc: ["'self'"],
     styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
     fontSrc: ["'self'", 'https://fonts.gstatic.com'],
-    imgSrc: ["'self'", 'data:', 'https:'],
+    imgSrc: ["'self'", 'data:', 'blob:', 'https:'],
     mediaSrc: ["'self'", 'https:'],
     frameSrc: ["'self'", 'https://www.google.com'],
     connectSrc: ["'self'"],
@@ -45,27 +45,34 @@ if (cfg.basePath) {
   app.use(cfg.basePath, express.static(path.join(__dirname, '../public'), { maxAge: cfg.isProd ? '1h' : 0, index: false }));
 }
 
+app.get('/favicon.ico', (_req, res) => res.status(204).end());
 app.get('/health', async (_req, res) => {
   try { await pool.query('SELECT 1'); res.json({ ok: true }); } catch (_) { res.status(503).json({ ok: false }); }
 });
 
 const authRoutes = require('./routes/auth');
 const publicApiRoutes = require('./routes/public').api;
+const staffApiRoutes = require('./routes/staff').api;
+const staffPagesRoutes = require('./routes/staff').pages;
 const invitationsRoutes = require('./routes/invitations');
 const pagesRoutes = require('./routes/pages');
 const publicPagesRoutes = require('./routes/public').pages;
 
 app.use('/api/auth', authRoutes);
 app.use('/api/public', publicApiRoutes);
+app.use('/api/scan', staffApiRoutes);
 app.use('/api', invitationsRoutes);
 app.use('/', pagesRoutes);
+app.use('/', staffPagesRoutes);
 app.use('/', publicPagesRoutes); // /:slug harus terakhir
 
 if (cfg.basePath) {
   app.use(`${cfg.basePath}/api/auth`, authRoutes);
   app.use(`${cfg.basePath}/api/public`, publicApiRoutes);
+  app.use(`${cfg.basePath}/api/scan`, staffApiRoutes);
   app.use(`${cfg.basePath}/api`, invitationsRoutes);
   app.use(cfg.basePath, pagesRoutes);
+  app.use(cfg.basePath, staffPagesRoutes);
   app.use(cfg.basePath, publicPagesRoutes);
 }
 

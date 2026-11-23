@@ -175,3 +175,16 @@ textarea { resize: vertical; }
 .linkbtn { background: none; border: 0; padding: 0; font: inherit; color: var(--brand); text-decoration: underline; cursor: pointer; }
 .err-list { margin: .6rem 0 0; padding-left: 1.1rem; font-size: .82rem; color: var(--err); max-height: 160px; overflow: auto; }
 .chips-row .palette { margin-right: .2rem; }
+
+/* ----- presensi QR, galeri, photobooth ----- */
+.toolbar { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; margin: .6rem 0; }
+pre.code { background: #1d1b24; color: #e9e6f2; padding: .8rem 1rem; border-radius: 10px; overflow: auto; font-size: .78rem; line-height: 1.5; white-space: pre-wrap; word-break: break-all; }
+.qr-box { display: flex; gap: 1.1rem; align-items: flex-start; flex-wrap: wrap; margin: 1rem 0; padding: 1rem; border: 1px dashed var(--line); border-radius: 14px; }
+.qr-box img { background: #fff; padding: 8px; border-radius: 12px; border: 1px solid var(--line); }
+.qr-box > div { flex: 1; min-width: 200px; } .qr-box code { font-size: .78rem; word-break: break-all; }
+.pgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: .6rem; }
+.pcell { position: relative; background: #fff; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.pcell img { display: block; width: 100%; aspect-ratio: 1; object-fit: cover; }
+.pcell small { display: block; padding: .3rem .5rem; font-size: .72rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pcell input { position: absolute; top: 6px; left: 6px; width: 18px; height: 18px; }
+.pcell .x { position: absolute; top: 4px; right: 4px; width: 24px; height: 24px; border: 0; border-radius: 50%; background: rgba(0,0,0,.6); color: #fff; cursor: pointer; line-height: 1; }

@@ -191,3 +191,18 @@ body.opened .music-btn { opacity: 1; pointer-events: auto; }
 .partner-row img { max-height: 44px; max-width: 120px; object-fit: contain; }
 .partner-row b { font-family: var(--font-heading); font-weight: 600; letter-spacing: .06em; opacity: .85; }
 .host-list.hosts-3, .host-list.hosts-4, .host-list.hosts-5, .host-list.hosts-6 { gap: 2rem; }
+
+/* ----- tiket masuk (QR pribadi) ----- */
+.ticket-card { text-align: center; max-width: 360px; margin: 0 auto; }
+.ticket-qr { width: min(260px, 70vw); margin: 1rem auto .6rem; padding: 12px; background: #fff; border-radius: 16px; box-shadow: 0 6px 20px rgba(0,0,0,.12); line-height: 0; }
+.ticket-qr svg { width: 100%; height: auto; display: block; }
+.ticket-name { display: block; font-family: var(--font-heading); font-size: 1.3rem; }
+.ticket-code { display: block; letter-spacing: .18em; text-transform: uppercase; margin-bottom: .8rem; }
+.ticket-status { list-style: none; margin: 0 0 1rem; padding: 0; display: grid; gap: .4rem; }
+.ticket-status li { display: flex; justify-content: space-between; gap: 1rem; padding: .5rem .9rem; border: 1px solid var(--line); border-radius: 12px; font-size: .88rem; }
+.ticket-status li.done { border-color: #2fae6a; background: color-mix(in srgb, #2fae6a 10%, transparent); }
+.ticket-status li.done b { color: #1f9a58; }
+.sec.ticket, body.inv[class*='night'] .ticket-status li.done b, body.inv[class*='noir'] .ticket-status li.done b, body.inv[class*='velvet'] .ticket-status li.done b, body.inv[class*='royal'] .ticket-status li.done b { }
+body.inv:is([class*='night'], [class*='noir'], [class*='velvet'], [class*='royal']) .ticket-status li.done b { color: #6fe0a2; }
+.ticket-actions { display: flex; flex-wrap: wrap; gap: .5rem; justify-content: center; }
+.ticket-sample { font-size: .78rem; margin: .9rem 0 0; }

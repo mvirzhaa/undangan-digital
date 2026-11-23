@@ -4,6 +4,8 @@ const bcrypt = require('bcryptjs');
 const { pool } = require('../src/db');
 const { defaultsFor } = require('../src/lib/defaults');
 const { THEMES } = require('../src/lib/themes');
+const { savePhotos, removeAll } = require('../src/lib/photos');
+const { makePng } = require('./make-png');
 
 const SAMPLES = [
   { type: 'wedding', title: 'Nadila & Azka', slug: 'demo-nadila-azka', theme: 'glass-rose' },
@@ -21,6 +23,8 @@ const SAMPLES = [
   const userId = u.rows[0].id;
 
   // Contoh lama milik akun demo dibuat ulang agar mengikuti format terbaru.
+  const old = await pool.query('SELECT id FROM invitations WHERE user_id = $1 AND slug = ANY($2::text[])', [userId, SAMPLES.map((x) => x.slug)]);
+  old.rows.forEach((o) => removeAll(o.id));
   await pool.query('DELETE FROM invitations WHERE user_id = $1 AND slug = ANY($2::text[])', [userId, SAMPLES.map((x) => x.slug)]);
 
   for (const s of SAMPLES) {
@@ -33,6 +37,7 @@ const SAMPLES = [
       d.content.cover.title = 'Nadila & Azka';
       d.content.events.forEach((e) => { e.venue = 'Gedung Serbaguna Bogor'; e.address = 'Jl. Pajajaran No. 10, Bogor'; });
       d.settings.sections.story = true;
+      d.settings.attendance = { photobooth: true, selfie: true, galleryAccess: 'contributors', boothShare: 'own' };
       d.content.story = [
         { date: '2019', title: 'Pertama bertemu', text: 'Berawal dari satu obrolan di kedai kopi kecil.' },
         { date: '2025', title: 'Lamaran', text: 'Dengan restu kedua keluarga, kami melangkah ke jenjang berikutnya.' },
@@ -53,14 +58,27 @@ const SAMPLES = [
     );
     if (s.type === 'wedding' && r.rowCount) {
       const id = r.rows[0].id;
-      const guests = [['Bapak Hendra (VIP)', 'vvip0001', 'demovip01'], ['Ibu Maya', '', 'demoreg01']];
+      const guests = [['Bapak Hendra (VIP)', 'vvip0001', 'demovip01'], ['Ibu Maya', '', 'demoreg01'], ['Rizky & Keluarga', '', 'demoreg02'], ['Dewi Anggraini', '', 'demoreg03']];
+      const gid = {};
       for (const [name, version, code] of guests) {
-        await pool.query(
+        const g = await pool.query(
           `INSERT INTO guests (invitation_id, name, code, group_name, pax_limit, version_id) VALUES ($1,$2,$3,'Keluarga',2,$4)
-           ON CONFLICT (code) DO NOTHING`, [id, name, code, version]);
+           ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name RETURNING id`, [id, name, code, version]);
+        gid[code] = g.rows[0].id;
       }
+      // Contoh presensi: Bapak Hendra sudah check-in & sesi photobooth; Ibu Maya sudah check-in; foto swafoto & photobooth contoh.
+      await pool.query(`UPDATE guests SET checked_in_at = now() - interval '40 minutes', checked_in_pax = 2, booth_at = now() - interval '20 minutes' WHERE id = $1`, [gid.demovip01]);
+      await pool.query(`UPDATE guests SET checked_in_at = now() - interval '25 minutes', checked_in_pax = 1 WHERE id = $1`, [gid.demoreg01]);
+      const tones = [[[230, 120, 150], [90, 50, 150]], [[250, 190, 120], [200, 70, 90]], [[120, 200, 190], [40, 90, 150]], [[190, 150, 230], [70, 60, 130]]];
+      const shot = (n) => ({ buffer: makePng(360, 360, tones[n % 4][0], tones[n % 4][1], n + 1) });
+      for (const [i, code] of ['demovip01', 'demoreg01', 'demoreg02', 'demoreg03', 'demovip01', 'demoreg01'].entries()) {
+        await savePhotos(id, [shot(i)], { kind: 'selfie', guestId: gid[code], name: '', key: '' });
+      }
+      for (let i = 0; i < 4; i += 1) await savePhotos(id, [shot(i + 6)], { kind: 'booth', guestId: gid.demovip01, name: '', key: '' });
     }
   }
+  const st = await pool.query("SELECT slug, staff_token FROM invitations WHERE slug = 'demo-nadila-azka'");
+  if (st.rowCount) console.log(`Pemindai petugas demo: /scan/${st.rows[0].staff_token}`);
   console.log('Seed selesai. Masuk dengan demo@example.com / demo12345');
   console.log('Contoh: /demo-nadila-azka, /demo-nadila-azka?to=demovip01 (versi VIP), /demo-sinta-17, /demo-midnight-gala');
   await pool.end();

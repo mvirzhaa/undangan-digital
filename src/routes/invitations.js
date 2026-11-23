@@ -13,6 +13,9 @@ const { defaultsFor } = require('../lib/defaults');
 const S = require('../lib/sanitize');
 const { cleanVersions } = require('../lib/versions');
 const X = require('../lib/excel');
+const JSZip = require('jszip');
+const A = require('../lib/attendance');
+const P = require('../lib/photos');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -159,6 +162,7 @@ router.put('/invitations/:id', async (req, res) => {
 router.delete('/invitations/:id', async (req, res) => {
   await query('DELETE FROM invitations WHERE id = $1', [req.inv.id]);
   fs.rm(path.join(UPLOAD_ROOT, String(req.inv.id)), { recursive: true, force: true }, () => {});
+  P.removeAll(req.inv.id);
   res.json({ ok: true });
 });
 
@@ -244,7 +248,7 @@ router.get('/invitations/:id/stats', async (req, res) => {
   ]);
   const rs = { hadir: { n: 0, pax: 0 }, tidak: { n: 0, pax: 0 }, ragu: { n: 0, pax: 0 } };
   r.rows.forEach((x) => { rs[x.attendance] = { n: x.n, pax: x.pax }; });
-  res.json({ guests: g.rows[0], rsvp: rs, wishes: w.rows[0], views: req.inv.views });
+  res.json({ guests: g.rows[0], rsvp: rs, wishes: w.rows[0], views: req.inv.views, attendance: await A.attendanceStats(id) });
 });
 
 // ---------- tamu ----------
@@ -407,30 +411,105 @@ router.get('/invitations/:id/guests/:gid/qr.svg', async (req, res) => {
   res.type('image/svg+xml').send(svg);
 });
 
-// ---------- check-in (buku tamu hari-H) ----------
+// ---------- presensi (buku tamu & photobooth) ----------
+// Pemilik juga bisa memindai/mengetik kode dari editor; aturannya sama dengan pemindai petugas.
 router.post('/invitations/:id/checkin', async (req, res) => {
-  let code = S.str(req.body.code, 300).trim();
-  const m = code.match(/[?&]to=([a-z0-9]+)/i);
-  if (m) code = m[1];
-  code = code.toLowerCase();
-  if (!code) return res.status(400).json({ error: 'Kode tamu kosong.' });
-
-  const found = await query('SELECT * FROM guests WHERE code = $1 AND invitation_id = $2', [code, req.inv.id]);
-  if (!found.rowCount) return res.status(404).json({ error: 'Kode tamu tidak ditemukan.' });
-  const g = found.rows[0];
-  if (g.checked_in_at) return res.json({ guest: g, already: true });
-
-  const pax = S.int(req.body.pax, 1, 50, g.pax_limit);
-  const r = await query(
-    'UPDATE guests SET checked_in_at = now(), checked_in_pax = $1 WHERE id = $2 RETURNING *',
-    [pax, g.id],
-  );
-  res.json({ guest: r.rows[0], already: false });
+  const station = req.body.station === 'booth' ? 'booth' : 'guestbook';
+  const pax = req.body.pax !== undefined && req.body.pax !== '' ? S.int(req.body.pax, 1, 50, undefined) : undefined;
+  const r = await A.recordScan(req.inv, station, { code: S.str(req.body.code, 400), guestId: req.body.guestId, pax, source: 'owner' });
+  const msg = { notfound: 'Kode tamu tidak ditemukan.', wrong: 'QR ini milik undangan lain.', disabled: 'Photobooth belum diaktifkan di Pengaturan presensi.', invalid: 'Pos tidak dikenal.' }[r.status];
+  if (msg) return res.status(r.status === 'notfound' ? 404 : 400).json({ error: msg, status: r.status });
+  res.json({ status: r.status, already: r.status === 'duplicate', guest: r.guest, at: r.at || null });
 });
 
 router.delete('/invitations/:id/guests/:gid/checkin', async (req, res) => {
   await query('UPDATE guests SET checked_in_at = NULL, checked_in_pax = NULL WHERE id = $1 AND invitation_id = $2', [req.params.gid, req.inv.id]);
   res.json({ ok: true });
+});
+
+router.delete('/invitations/:id/guests/:gid/booth', async (req, res) => {
+  await query('UPDATE guests SET booth_at = NULL WHERE id = $1 AND invitation_id = $2', [req.params.gid, req.inv.id]);
+  res.json({ ok: true });
+});
+
+// Kunci akses pemindai petugas / mesin photobooth. Mengganti kunci mematikan link lama.
+router.post('/invitations/:id/staff-token', async (req, res) => {
+  const token = crypto.randomBytes(16).toString('hex');
+  await query('UPDATE invitations SET staff_token = $1 WHERE id = $2', [token, req.inv.id]);
+  res.json({ staff_token: token });
+});
+
+router.get('/invitations/:id/scans', async (req, res) => {
+  const r = await query(
+    `SELECT l.id, l.station, l.result, l.source, l.created_at, g.name FROM scan_log l LEFT JOIN guests g ON g.id = l.guest_id
+      WHERE l.invitation_id = $1 ORDER BY l.id DESC LIMIT 60`, [req.inv.id]);
+  res.json({ scans: r.rows });
+});
+
+// QR acara: satu untuk semua tamu, mengarah ke halaman swafoto.
+router.get('/invitations/:id/event-qr.svg', async (req, res) => {
+  const svg = await QRCode.toString(`${cfg.baseUrl}/${req.inv.slug}/foto`, { type: 'svg', margin: 1, width: 400 });
+  res.type('image/svg+xml').send(svg);
+});
+
+// ---------- galeri: swafoto tamu & photobooth ----------
+const photoKind = (v) => (v === 'booth' ? 'booth' : 'selfie');
+
+router.get('/invitations/:id/photos', async (req, res) => {
+  const kind = photoKind(req.query.kind);
+  const r = await query(
+    `SELECT p.id, p.kind, p.guest_id, p.uploader_name, p.bytes, p.created_at, g.name AS guest_name
+       FROM photos p LEFT JOIN guests g ON g.id = p.guest_id
+      WHERE p.invitation_id = $1 AND p.kind = $2 ORDER BY p.created_at DESC, p.id DESC LIMIT 400`, [req.inv.id, kind]);
+  const n = await query('SELECT count(*)::int AS n FROM photos WHERE invitation_id = $1 AND kind = $2', [req.inv.id, kind]);
+  res.json({ photos: r.rows, total: n.rows[0].n });
+});
+
+// Unggah foto photobooth dari editor (fotografer / operator). Mesin photobooth memakai kunci petugas.
+router.post('/invitations/:id/photos', async (req, res) => {
+  const err = await P.runUpload(P.memoryUpload(20, 15 * 1024 * 1024), req, res);
+  if (err) return res.status(400).json({ error: err });
+  if (!req.files || !req.files.length) return res.status(400).json({ error: 'Pilih foto dulu.' });
+  const total = await query(`SELECT count(*)::int AS n FROM photos WHERE invitation_id = $1 AND kind = 'booth'`, [req.inv.id]);
+  if (total.rows[0].n + req.files.length > P.LIMITS.boothTotal) return res.status(400).json({ error: 'Batas jumlah foto photobooth tercapai.' });
+  let guest = null;
+  if (req.body.guest_id) guest = (await query('SELECT id, name FROM guests WHERE id = $1 AND invitation_id = $2', [S.int(req.body.guest_id, 1, 2147483647, 0), req.inv.id])).rows[0] || null;
+  const out = await P.savePhotos(req.inv.id, req.files, { kind: 'booth', guestId: guest ? guest.id : null, name: guest ? guest.name : '' });
+  if (!out.saved.length) return res.status(400).json({ error: 'Berkas bukan foto (JPG, PNG, atau WebP).' });
+  res.status(201).json({ saved: out.saved.length, rejected: out.rejected });
+});
+
+router.delete('/invitations/:id/photos/:pid', async (req, res) => {
+  if (!/^\d+$/.test(req.params.pid)) return res.status(404).json({ error: 'Foto tidak ditemukan.' });
+  const r = await query('DELETE FROM photos WHERE id = $1 AND invitation_id = $2 RETURNING file', [req.params.pid, req.inv.id]);
+  P.removeFiles(req.inv.id, r.rows.map((x) => x.file));
+  res.json({ ok: true });
+});
+
+router.post('/invitations/:id/photos/bulk-delete', async (req, res) => {
+  const ids = (Array.isArray(req.body.ids) ? req.body.ids : []).slice(0, 500).filter((x) => /^\d+$/.test(String(x))).map(Number);
+  if (!ids.length) return res.json({ affected: 0 });
+  const r = await query('DELETE FROM photos WHERE invitation_id = $1 AND id = ANY($2::int[]) RETURNING file', [req.inv.id, ids]);
+  P.removeFiles(req.inv.id, r.rows.map((x) => x.file));
+  res.json({ affected: r.rowCount });
+});
+
+// Unduh semua foto sebagai satu berkas zip.
+router.get('/invitations/:id/photos.zip', async (req, res) => {
+  const kind = photoKind(req.query.kind);
+  const r = await query(
+    `SELECT p.id, p.file, p.created_at, coalesce(nullif(g.name, ''), nullif(p.uploader_name, ''), 'tamu') AS who
+       FROM photos p LEFT JOIN guests g ON g.id = p.guest_id WHERE p.invitation_id = $1 AND p.kind = $2 ORDER BY p.id`, [req.inv.id, kind]);
+  if (!r.rowCount) return res.status(404).json({ error: 'Belum ada foto.' });
+  const zip = new JSZip();
+  r.rows.forEach((p) => {
+    const fp = P.photoPath(req.inv.id, p.file);
+    if (!fp || !fs.existsSync(fp)) return;
+    const who = p.who.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 30) || 'tamu';
+    zip.file(`${String(p.id).padStart(5, '0')}-${who}${path.extname(p.file)}`, fs.createReadStream(fp));
+  });
+  res.set({ 'Content-Type': 'application/zip', 'Content-Disposition': `attachment; filename="${kind === 'booth' ? 'photobooth' : 'galeri-kegiatan'}-${req.inv.slug}.zip"` });
+  zip.generateNodeStream({ streamFiles: true, compression: 'STORE' }).on('error', () => res.destroy()).pipe(res);
 });
 
 // ---------- RSVP ----------

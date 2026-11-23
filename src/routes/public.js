@@ -6,6 +6,12 @@ const { buildView, safeJson, OFFSET } = require('../lib/render');
 const i18n = require('../lib/i18n');
 const S = require('../lib/sanitize');
 const { applyVersion } = require('../lib/versions');
+const fs = require('fs');
+const cfg = require('../config');
+const { attendanceCfg } = require('../lib/attcfg');
+const P = require('../lib/photos');
+const { buildTicket, qrSvg } = require('../lib/ticket');
+const { themeVars } = require('../lib/render');
 
 const api = express.Router();
 const pages = express.Router();
@@ -142,7 +148,128 @@ pages.get('/:slug', async (req, res, next) => {
   }
 
   const view = buildView(inv, { guest, preview: false });
-  res.render('invitation', { ...view, safeJson });
+  const ticket = await buildTicket(inv, guest, req);
+  res.render('invitation', { ...view, ticket, safeJson });
+});
+
+// ---------------- swafoto, galeri kegiatan & photobooth ----------------
+const selfieLimiter = rateLimit({ windowMs: 10 * 60 * 1000, max: 40, message: 'Terlalu banyak unggahan. Coba lagi beberapa menit lagi.' });
+
+api.post('/:slug/selfie', selfieLimiter, async (req, res) => {
+  const inv = await findPublished(req.params.slug);
+  if (!inv) return res.status(404).json({ error: 'Acara tidak ditemukan.' });
+  if (!attendanceCfg(inv.settings).selfie) return res.status(403).json({ error: 'Unggah foto belum dibuka oleh penyelenggara.' });
+  const err = await P.runUpload(P.memoryUpload(6, 10 * 1024 * 1024), req, res);
+  if (err) return res.status(400).json({ error: err });
+  if (!req.files || !req.files.length) return res.status(400).json({ error: 'Pilih atau ambil foto dulu.' });
+
+  const v = await P.visitor(req, inv);
+  const name = v.guest ? v.guest.name : S.str(req.body.name, 80).trim();
+  if (!name) return res.status(400).json({ error: 'Nama wajib diisi.' });
+
+  const mine = await query(
+    `SELECT count(*)::int AS n FROM photos WHERE invitation_id = $1 AND kind = 'selfie'
+        AND (($2 <> '' AND uploader_key = $2) OR ($3::int IS NOT NULL AND guest_id = $3))`, [inv.id, v.key, v.guest ? v.guest.id : null]);
+  const all = await query(`SELECT count(*)::int AS n FROM photos WHERE invitation_id = $1 AND kind = 'selfie'`, [inv.id]);
+  if (all.rows[0].n + req.files.length > P.LIMITS.selfieTotal) return res.status(400).json({ error: 'Galeri sudah penuh.' });
+  if (mine.rows[0].n + req.files.length > P.LIMITS.selfiePerUploader) return res.status(400).json({ error: `Maksimal ${P.LIMITS.selfiePerUploader} foto per tamu.` });
+
+  const key = P.rememberVisitor(res, inv, v, v.guest);
+  const out = await P.savePhotos(inv.id, req.files, { kind: 'selfie', guestId: v.guest ? v.guest.id : null, name, key });
+  if (!out.saved.length) return res.status(400).json({ error: 'Berkas bukan foto (JPG, PNG, atau WebP).' });
+  const q = v.guest ? `?to=${v.guest.code}` : '';
+  const base = `${cfg.basePath || ''}/${inv.slug}`;
+  res.status(201).json({ saved: out.saved.length, rejected: out.rejected, mine: mine.rows[0].n + out.saved.length, name, galleryUrl: `${base}/galeri${q}` });
+});
+
+async function pageCtx(req, inv, extra = {}) {
+  const lang = inv.settings.lang === 'en' ? 'en' : 'id';
+  const t = i18n(lang, inv.event_type);
+  const tv = themeVars(inv);
+  return { inv, t, lang, ...tv, theme: inv.theme, pageTitle: inv.title, basePath: cfg.basePath, ...extra, safeJson };
+}
+async function findVisible(req, slug) {
+  const r = await query('SELECT * FROM invitations WHERE slug = $1', [String(slug).toLowerCase()]);
+  const inv = r.rows[0];
+  if (!inv) return null;
+  const isOwner = !!(req.user && req.user.id === inv.user_id);
+  return inv.status === 'published' || isOwner ? inv : null;
+}
+const evNotice = (res, status, inv, title, text, link) => res.status(status).render('event-notice', { title, text, link: link || null, inv, basePath: cfg.basePath, ...themeVars(inv), t: i18n(inv.settings.lang === 'en' ? 'en' : 'id', inv.event_type) });
+
+// Halaman tujuan QR acara: tamu mengambil/mengunggah swafoto.
+pages.get('/:slug/foto', async (req, res, next) => {
+  const inv = await findVisible(req, req.params.slug);
+  if (!inv) return next();
+  const a = attendanceCfg(inv.settings);
+  const v = await P.visitor(req, inv);
+  const mine = v.key || v.guest ? (await query(
+    `SELECT count(*)::int AS n FROM photos WHERE invitation_id = $1 AND kind = 'selfie' AND (($2 <> '' AND uploader_key = $2) OR ($3::int IS NOT NULL AND guest_id = $3))`,
+    [inv.id, v.key, v.guest ? v.guest.id : null])).rows[0].n : 0;
+  const canGallery = a.selfie && await P.canViewGallery(inv, v);
+  const data = { slug: inv.slug, enabled: a.selfie, guestName: v.guest ? v.guest.name : '', knownGuest: !!v.guest, mine, hasGallery: canGallery, qs: v.guest ? `?to=${v.guest.code}` : '', basePath: cfg.basePath || '' };
+  res.set('Cache-Control', 'no-store');
+  res.render('selfie', { ...(await pageCtx(req, inv)), a, data, galleryOwner: v.isOwner });
+});
+
+pages.get('/:slug/galeri', async (req, res, next) => {
+  const inv = await findVisible(req, req.params.slug);
+  if (!inv) return next();
+  const v = await P.visitor(req, inv);
+  const base = `${cfg.basePath || ''}/${inv.slug}`;
+  if (!attendanceCfg(inv.settings).selfie && !v.isOwner) return evNotice(res, 404, inv, 'Galeri belum dibuka', 'Galeri kegiatan belum dibuka oleh penyelenggara.');
+  if (!(await P.canViewGallery(inv, v))) {
+    return evNotice(res, 403, inv, 'Galeri khusus peserta', 'Galeri ini dapat dilihat oleh tamu yang ikut mengunggah foto kegiatan. Ambil swafoto lewat QR acara untuk membukanya.', { href: `${base}/foto${v.guest ? `?to=${v.guest.code}` : ''}`, label: 'Ambil swafoto' });
+  }
+  const r = await query(
+    `SELECT p.id, p.created_at, coalesce(nullif(g.name, ''), nullif(p.uploader_name, ''), '') AS who FROM photos p LEFT JOIN guests g ON g.id = p.guest_id
+      WHERE p.invitation_id = $1 AND p.kind = 'selfie' ORDER BY p.created_at DESC, p.id DESC LIMIT 300`, [inv.id]);
+  const total = (await query(`SELECT count(*)::int AS n FROM photos WHERE invitation_id = $1 AND kind = 'selfie'`, [inv.id])).rows[0].n;
+  res.set('Cache-Control', 'no-store');
+  res.render('gallery', { ...(await pageCtx(req, inv)), mode: 'selfie', heading: 'Galeri Kegiatan', qs: v.guest ? `?to=${v.guest.code}` : '', photos: r.rows, total, back: `${base}${v.guest ? `?to=${v.guest.code}` : ''}`, shootUrl: attendanceCfg(inv.settings).selfie ? `${base}/foto${v.guest ? `?to=${v.guest.code}` : ''}` : '' });
+});
+
+pages.get('/:slug/photobooth', async (req, res, next) => {
+  const inv = await findVisible(req, req.params.slug);
+  if (!inv) return next();
+  const a = attendanceCfg(inv.settings);
+  const v = await P.visitor(req, inv);
+  const base = `${cfg.basePath || ''}/${inv.slug}`;
+  if (!a.photobooth && !v.isOwner) return evNotice(res, 404, inv, 'Photobooth tidak tersedia', 'Acara ini tidak memakai photobooth.');
+  if (!P.canViewBooth(inv, v, null)) return evNotice(res, 403, inv, 'Buka lewat link undangan', 'Foto photobooth dapat dilihat dari link undangan pribadi Anda (tombol “Foto Photobooth Saya”).');
+  const own = !v.isOwner && a.boothShare !== 'all';
+  const r = await query(
+    `SELECT p.id, p.created_at, coalesce(nullif(g.name, ''), nullif(p.uploader_name, ''), '') AS who FROM photos p LEFT JOIN guests g ON g.id = p.guest_id
+      WHERE p.invitation_id = $1 AND p.kind = 'booth' ${own ? 'AND p.guest_id = $2' : ''} ORDER BY p.created_at DESC, p.id DESC LIMIT 300`,
+    own ? [inv.id, v.guest.id] : [inv.id]);
+  res.set('Cache-Control', 'no-store');
+  res.render('gallery', { ...(await pageCtx(req, inv)), mode: 'booth', heading: own ? 'Foto Photobooth Saya' : 'Galeri Photobooth', photos: r.rows, total: r.rowCount, qs: v.guest ? `?to=${v.guest.code}` : '', back: `${base}${v.guest ? `?to=${v.guest.code}` : ''}`, shootUrl: '' });
+});
+
+// Penyaji foto: hak akses diperiksa per foto (file tidak berada di folder publik).
+pages.get('/:slug/media/:id', async (req, res, next) => {
+  if (!/^\d+$/.test(req.params.id)) return next();
+  const inv = await findVisible(req, req.params.slug);
+  if (!inv) return next();
+  const p = (await query('SELECT * FROM photos WHERE id = $1 AND invitation_id = $2', [req.params.id, inv.id])).rows[0];
+  if (!p) return next();
+  const v = await P.visitor(req, inv);
+  const allowed = p.kind === 'booth' ? P.canViewBooth(inv, v, p) : await P.canViewGallery(inv, v);
+  if (!allowed) return res.status(403).end();
+  const fp = P.photoPath(inv.id, p.file);
+  if (!fp || !fs.existsSync(fp)) return next();
+  res.set({ 'Content-Type': p.mime, 'Cache-Control': 'private, max-age=3600', 'Content-Disposition': 'inline' });
+  fs.createReadStream(fp).pipe(res);
+});
+
+// QR pribadi tamu sebagai gambar (untuk diunduh).
+pages.get('/:slug/tiket.svg', async (req, res, next) => {
+  const inv = await findPublished(req.params.slug);
+  if (!inv) return next();
+  const guest = await findGuest(inv.id, req.query.to);
+  if (!guest) return next();
+  res.set({ 'Content-Type': 'image/svg+xml', 'Cache-Control': 'private, max-age=600', 'Content-Disposition': `attachment; filename="qr-${guest.code}.svg"` });
+  res.send(await qrSvg(inv, guest.code));
 });
 
 module.exports = { api, pages };

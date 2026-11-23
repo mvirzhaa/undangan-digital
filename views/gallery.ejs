@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="<%= lang %>">
+<head>
+  <title><%= heading %> — <%= inv.title %></title>
+  <%- include('partials/ev-head', { fontsUrl }) %>
+</head>
+<body class="ev" style="<%= cssVars %>">
+<main class="ev-wrap wide">
+  <header class="ev-head"><small><%= inv.title %></small><h1><%= heading %></h1>
+    <p class="muted"><%= total %> foto<% if (mode === 'selfie') { %> dari para tamu<% } %></p></header>
+  <% if (shootUrl) { %><p class="center"><a class="btn primary" href="<%= shootUrl %>">📷 Tambah foto</a></p><% } %>
+
+  <% if (!photos.length) { %>
+  <section class="card center"><p class="muted"><%= mode === 'booth' ? 'Foto photobooth belum tersedia. Foto akan muncul di sini setelah sesi photobooth Anda.' : 'Belum ada foto. Jadilah yang pertama berbagi!' %></p></section>
+  <% } else { %>
+  <div class="grid" id="grid">
+    <% photos.forEach(function (p, i) { %>
+    <a class="ph" href="<%= basePath %>/<%= inv.slug %>/media/<%= p.id %><%= qs %>" data-i="<%= i %>" data-who="<%= p.who %>">
+      <img src="<%= basePath %>/<%= inv.slug %>/media/<%= p.id %><%= qs %>" alt="Foto <%= p.who ? 'oleh ' + p.who : (i + 1) %>" loading="lazy" decoding="async">
+      <% if (p.who && mode === 'selfie') { %><span><%= p.who %></span><% } %>
+    </a>
+    <% }) %>
+  </div>
+  <% if (total > photos.length) { %><p class="muted center">Menampilkan <%= photos.length %> foto terbaru.</p><% } %>
+  <% } %>
+
+  <p class="ev-foot"><a href="<%= back %>">← Kembali ke undangan</a></p>
+</main>
+<div class="lb" id="lb" hidden>
+  <button type="button" class="lb-x" aria-label="Tutup">×</button>
+  <button type="button" class="lb-n prev" aria-label="Sebelumnya">‹</button>
+  <img alt="">
+  <button type="button" class="lb-n next" aria-label="Berikutnya">›</button>
+  <div class="lb-bar"><span id="lb-who"></span><a id="lb-dl" class="btn small" download>Unduh</a></div>
+</div>
+<script src="<%= basePath %>/js/gallery.js"></script>
+</body>
+</html>

@@ -7,6 +7,7 @@ const path = require('path');
 const ExcelJS = require('exceljs');
 const app = require('../src/server');
 const { pool } = require('../src/db');
+const { makePng } = require('./make-png');
 
 let passed = 0;
 const results = [];
@@ -482,6 +483,325 @@ async function test(name, fn) {
     assert.ok(!ed.data.includes('<script>alert(1)</script>'), 'boot JSON harus aman');
     assert.strictEqual((await anon.req('GET', '/')).status, 200);
     assert.strictEqual((await anon.req('GET', '/tidak-ada-halaman')).status, 404);
+  });
+
+
+  // ===================== v3: presensi QR, photobooth, swafoto & galeri =====================
+  class Jar extends Client { // menyimpan banyak cookie (kunci perangkat & kode tamu)
+    constructor() { super(); this.jar = {}; }
+    async req(method, path, body, headers = {}) {
+      const h = { ...headers };
+      const ck = Object.entries(this.jar).map(([k, v]) => `${k}=${v}`).join('; ');
+      if (ck) h.Cookie = ck;
+      let payload = body;
+      if (body && !(body instanceof FormData)) { h['Content-Type'] = 'application/json'; payload = JSON.stringify(body); }
+      const r = await fetch(base + path, { method, headers: h, body: payload, redirect: 'manual' });
+      (r.headers.getSetCookie ? r.headers.getSetCookie() : []).forEach((c) => { const [kv] = c.split(';'); const i = kv.indexOf('='); this.jar[kv.slice(0, i)] = kv.slice(i + 1); });
+      const type = r.headers.get('content-type') || '';
+      const buf = Buffer.from(await r.arrayBuffer());
+      const data = type.includes('json') ? JSON.parse(buf.toString() || 'null') : (type.startsWith('text/') || type.includes('svg') ? buf.toString() : buf);
+      return { status: r.status, data, headers: r.headers };
+    }
+  }
+  const png = (n = 1) => makePng(64, 64, [200, 80, 120], [60, 40, 140], n);
+  const photoForm = (bufs, extra = {}) => {
+    const fd = new FormData();
+    bufs.forEach((b, i) => fd.append('photos', new Blob([b], { type: 'image/png' }), `f${i}.png`));
+    Object.entries(extra).forEach(([k, v]) => fd.append(k, v));
+    return fd;
+  };
+  const A3 = {}; // undangan untuk uji presensi
+  const ownerBin = new Jar(); ownerBin.jar.token = owner.cookie.replace(/^token=/, ''); // untuk unduhan biner
+  const setAtt = (patch) => owner.req('PUT', `/api/invitations/${A3.id}`, { settings: { ...A3.settings, attendance: { ...A3.settings.attendance, ...patch } } }).then((r) => { A3.settings = r.data.invitation.settings; return r; });
+
+  await test('presensi: undangan uji, tamu, kunci petugas unik, bawaan semua mati', async () => {
+    const c = await owner.req('POST', '/api/invitations', { title: `Presensi ${tag}`, event_type: 'birthday' });
+    assert.strictEqual(c.status, 201); A3.id = c.data.id; A3.slug = c.data.slug;
+    const g = await owner.req('GET', `/api/invitations/${A3.id}`); A3.settings = g.data.invitation.settings; A3.token = g.data.invitation.staff_token;
+    assert.match(A3.token, /^[a-f0-9]{32}$/);
+    assert.deepStrictEqual(A3.settings.attendance, { photobooth: false, selfie: false, galleryAccess: 'contributors', boothShare: 'own' });
+    assert.strictEqual((await owner.req('PUT', `/api/invitations/${A3.id}`, { status: 'published' })).status, 200);
+    A3.g = [];
+    for (const n of ['Ani Presensi', 'Budi Presensi', 'Cici Presensi', 'Dedi Presensi']) {
+      const r = await owner.req('POST', `/api/invitations/${A3.id}/guests`, { name: n, pax_limit: 3 }); assert.strictEqual(r.status, 201); A3.g.push(r.data.guest);
+    }
+    const o = await owner.req('POST', '/api/invitations', { title: `Lain ${tag}`, event_type: 'other' });
+    const og = await owner.req('GET', `/api/invitations/${o.data.id}`);
+    assert.notStrictEqual(og.data.invitation.staff_token, A3.token);
+    A3.otherInv = o.data;
+  });
+
+  await test('pemindai: kunci salah / bukan hex ditolak, tanpa login tidak bisa lewat API pemilik', async () => {
+    assert.strictEqual((await anon.req('GET', `/api/scan/${'0'.repeat(32)}/info`)).status, 404);
+    assert.strictEqual((await anon.req('GET', '/api/scan/bukan-hex/info')).status, 404);
+    assert.strictEqual((await anon.req('GET', `/scan/${'a'.repeat(32)}`)).status, 404);
+    assert.strictEqual((await anon.req('POST', `/api/invitations/${A3.id}/checkin`, { code: 'abc' })).status, 401);
+    assert.strictEqual((await anon.req('POST', `/api/invitations/${A3.id}/staff-token`)).status, 401);
+    const page = await anon.req('GET', `/scan/${A3.token}`);
+    assert.strictEqual(page.status, 200); assert.ok(page.data.includes('jsqr.js') && page.data.includes('sc-boot'));
+    assert.ok(!page.data.includes(A3.token + '"') || page.data.includes('sc-boot'), 'token hanya di JSON boot');
+  });
+
+  await test('buku tamu: pindai QR (link / kode / id) → hadir; pindai ulang DITOLAK; QR undangan lain ditolak', async () => {
+    const [ani, budi] = A3.g;
+    const qrText = `${'http://localhost:3000'}/${A3.slug}?to=${ani.code}`;
+    let r = await anon.req('POST', `/api/scan/${A3.token}/scan`, { station: 'guestbook', code: qrText });
+    assert.strictEqual(r.status, 200); assert.strictEqual(r.data.status, 'ok'); assert.strictEqual(r.data.guest.checked_in_pax, 3);
+    r = await anon.req('POST', `/api/scan/${A3.token}/scan`, { station: 'guestbook', code: ani.code });
+    assert.strictEqual(r.data.status, 'duplicate'); assert.ok(r.data.at);
+    r = await anon.req('POST', `/api/scan/${A3.token}/scan`, { station: 'guestbook', code: qrText.toUpperCase().replace('HTTP', 'http') });
+    assert.strictEqual(r.data.status, 'duplicate');
+    r = await anon.req('POST', `/api/scan/${A3.token}/scan`, { station: 'guestbook', guestId: budi.id, pax: 2 });
+    assert.strictEqual(r.data.status, 'ok'); assert.strictEqual(r.data.guest.checked_in_pax, 2);
+    r = await anon.req('POST', `/api/scan/${A3.token}/scan`, { station: 'guestbook', code: 'zzzzzzzz' });
+    assert.strictEqual(r.data.status, 'notfound');
+    r = await anon.req('POST', `/api/scan/${A3.token}/scan`, { station: 'guestbook', code: `http://localhost:3000/lain-slug?to=${A3.g[2].code}` });
+    assert.strictEqual(r.data.status, 'wrong');
+    r = await anon.req('POST', `/api/scan/${A3.token}/scan`, { station: 'guestbook', code: '' });
+    assert.strictEqual(r.data.status, 'notfound');
+    r = await anon.req('POST', `/api/scan/${A3.token}/scan`, { station: 'guestbook', guestId: '1 OR 1=1' });
+    assert.strictEqual(r.data.status, 'notfound');
+    assert.strictEqual(r.data.stats.checked_in, 2);
+    const list = await owner.req('GET', `/api/invitations/${A3.id}/guests`);
+    assert.ok(list.data.guests.find((x) => x.id === ani.id).checked_in_at, 'tertanda hadir di buku tamu');
+    const logs = await owner.req('GET', `/api/invitations/${A3.id}/scans`);
+    assert.ok(logs.data.scans.some((x) => x.result === 'duplicate') && logs.data.scans.some((x) => x.result === 'ok'));
+  });
+
+  await test('buku tamu: 8 pindai serentak untuk satu QR → tepat satu yang berhasil', async () => {
+    const cici = A3.g[2];
+    const rs = await Promise.all(Array.from({ length: 8 }, () => anon.req('POST', `/api/scan/${A3.token}/scan`, { station: 'guestbook', code: cici.code })));
+    assert.strictEqual(rs.filter((r) => r.data.status === 'ok').length, 1);
+    assert.strictEqual(rs.filter((r) => r.data.status === 'duplicate').length, 7);
+    const n = await pool.query(`SELECT count(*)::int AS n FROM scan_log WHERE guest_id = $1 AND station = 'guestbook' AND result = 'ok'`, [cici.id]);
+    assert.strictEqual(n.rows[0].n, 1);
+  });
+
+  await test('petugas: ubah jumlah hadir, cari nama; pemilik bisa membatalkan lalu tamu dapat dipindai lagi', async () => {
+    const dedi = A3.g[3];
+    let r = await anon.req('POST', `/api/scan/${A3.token}/pax`, { guestId: dedi.id, pax: 2 });
+    assert.strictEqual(r.status, 404, 'belum hadir → tidak bisa ubah jumlah');
+    await anon.req('POST', `/api/scan/${A3.token}/scan`, { station: 'guestbook', code: dedi.code });
+    r = await anon.req('POST', `/api/scan/${A3.token}/pax`, { guestId: dedi.id, pax: 2 });
+    assert.strictEqual(r.status, 200); assert.strictEqual(r.data.guest.checked_in_pax, 2);
+    r = await anon.req('GET', `/api/scan/${A3.token}/search?q=${encodeURIComponent('dedi')}`);
+    assert.strictEqual(r.data.guests.length, 1); assert.ok(r.data.guests[0].checked_in_at); assert.ok(!('code' in r.data.guests[0]) && !('phone' in r.data.guests[0]), 'kode & telepon tidak bocor ke pencarian');
+    assert.strictEqual((await anon.req('GET', `/api/scan/${A3.token}/search?q=%25`)).data.guests.length, 0, 'wildcard % tidak dianggap pola');
+    await owner.req('DELETE', `/api/invitations/${A3.id}/guests/${dedi.id}/checkin`);
+    assert.strictEqual((await anon.req('POST', `/api/scan/${A3.token}/scan`, { station: 'guestbook', code: dedi.code })).data.status, 'ok');
+  });
+
+  await test('photobooth: mati secara bawaan; dicentang → QR yang sama dipindai sekali di pos photobooth (terpisah dari buku tamu)', async () => {
+    const ani = A3.g[0];
+    assert.strictEqual((await anon.req('POST', `/api/scan/${A3.token}/scan`, { station: 'booth', code: ani.code })).data.status, 'disabled');
+    assert.strictEqual((await anon.req('POST', `/api/scan/${A3.token}/photos`, photoForm([png()]))).status, 403);
+    assert.strictEqual((await setAtt({ photobooth: true })).status, 200);
+    let r = await anon.req('POST', `/api/scan/${A3.token}/scan`, { station: 'booth', code: ani.code });
+    assert.strictEqual(r.data.status, 'ok'); assert.ok(r.data.guest.booth_at);
+    r = await anon.req('POST', `/api/scan/${A3.token}/scan`, { station: 'booth', code: ani.code });
+    assert.strictEqual(r.data.status, 'duplicate');
+    const e = await owner.req('POST', `/api/invitations/${A3.id}/checkin`, { code: A3.g[1].code, station: 'booth' });
+    assert.strictEqual(e.data.status, 'ok');
+    const e2 = await owner.req('POST', `/api/invitations/${A3.id}/checkin`, { code: A3.g[1].code, station: 'booth' });
+    assert.strictEqual(e2.data.already, true);
+    assert.strictEqual((await owner.req('POST', `/api/invitations/${A3.id}/checkin`, { code: A3.g[1].code, station: 'guestbook' })).data.already, true, 'buku tamu sudah tercatat, tidak bergantung photobooth');
+    assert.strictEqual(r.data.stats.booth, 1);
+    // pemindaian booth tidak mengubah buku tamu tamu lain
+    const dedi = (await owner.req('GET', `/api/invitations/${A3.id}/guests`)).data.guests.find((x) => x.id === A3.g[3].id);
+    assert.ok(dedi.checked_in_at && !dedi.booth_at);
+  });
+
+  await test('swafoto: tertutup bawaan; dibuka → hanya gambar asli (JPG/PNG/WebP), nama wajib bila bukan tamu', async () => {
+    const v = new Jar();
+    assert.strictEqual((await v.req('POST', `/api/public/${A3.slug}/selfie`, photoForm([png()], { name: 'X' }))).status, 403);
+    assert.strictEqual((await v.req('GET', `/${A3.slug}/foto`)).status, 200);
+    assert.ok((await v.req('GET', `/${A3.slug}/foto`)).data.includes('belum dibuka'));
+    await setAtt({ selfie: true });
+    const page = await v.req('GET', `/${A3.slug}/foto`);
+    assert.ok(page.data.includes('id="f-cam"') && page.data.includes('capture="user"'));
+    assert.strictEqual((await v.req('POST', `/api/public/${A3.slug}/selfie`, photoForm([png()]))).status, 400, 'nama wajib');
+    const fakes = new FormData();
+    fakes.append('name', 'Penyusup');
+    fakes.append('photos', new Blob(['<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>'], { type: 'image/png' }), 'x.png');
+    fakes.append('photos', new Blob(['GIF89a-bukan-gambar-valid-saja'], { type: 'image/png' }), 'y.png');
+    fakes.append('photos', new Blob(['<?php echo 1; ?>'.padEnd(40, ' ')], { type: 'image/png' }), 'z.png');
+    assert.strictEqual((await v.req('POST', `/api/public/${A3.slug}/selfie`, fakes)).status, 400, 'SVG / skrip ditolak walau bertipe png');
+    assert.strictEqual((await v.req('POST', `/api/public/${A3.slug}/selfie`, photoForm(Array.from({ length: 7 }, () => png()), { name: 'Banyak' }))).status, 400, 'maks 6 per unggahan');
+    const fd = photoForm([png(1), png(2)], { name: 'Tamu Umum' });
+    fd.append('photos', new Blob(['bukan gambar sama sekali, hanya teks biasa'], { type: 'image/png' }), 'bad.png');
+    const ok = await v.req('POST', `/api/public/${A3.slug}/selfie`, fd);
+    assert.strictEqual(ok.status, 201, JSON.stringify(ok.data)); assert.strictEqual(ok.data.saved, 2); assert.strictEqual(ok.data.rejected, 1);
+    assert.ok(v.jar[`ud_k_${A3.id}`], 'kunci perangkat tersimpan sebagai cookie');
+    A3.visitor = v;
+  });
+
+  await test('galeri kegiatan: hanya kontributor; orang lain & anonim ditolak; akses "tamu"/"publik" bisa dipilih', async () => {
+    const v = A3.visitor; const stranger = new Jar();
+    const g = await v.req('GET', `/${A3.slug}/galeri`);
+    assert.strictEqual(g.status, 200); assert.ok(g.data.includes('2 foto') && g.data.includes('Tamu Umum'));
+    const id = (g.data.match(/\/media\/(\d+)/) || [])[1]; assert.ok(id);
+    const img = await v.req('GET', `/${A3.slug}/media/${id}`);
+    assert.strictEqual(img.status, 200); assert.strictEqual(img.headers.get('content-type'), 'image/png'); assert.strictEqual(img.data.subarray(0, 4).toString('hex'), '89504e47');
+    assert.strictEqual((await stranger.req('GET', `/${A3.slug}/galeri`)).status, 403);
+    assert.strictEqual((await stranger.req('GET', `/${A3.slug}/media/${id}`)).status, 403);
+    assert.strictEqual((await anon.req('GET', `/${A3.slug}/media/${id}`)).status, 403);
+    assert.strictEqual((await stranger.req('GET', `/${A3.slug}/media/abc`)).status, 404);
+    assert.strictEqual((await stranger.req('GET', `/${A3.slug}/media/99999999`)).status, 404);
+    // pemilik selalu bisa
+    assert.strictEqual((await owner.req('GET', `/${A3.slug}/media/${id}`)).status, 200);
+    await setAtt({ galleryAccess: 'guests' });
+    assert.strictEqual((await stranger.req('GET', `/${A3.slug}/galeri`)).status, 403, 'bukan tamu');
+    assert.strictEqual((await stranger.req('GET', `/${A3.slug}/galeri?to=${A3.g[1].code}`)).status, 200, 'tamu terdaftar boleh');
+    assert.strictEqual((await stranger.req('GET', `/${A3.slug}/galeri?to=zzzzzzzz`)).status, 403);
+    await setAtt({ galleryAccess: 'public' });
+    assert.strictEqual((await new Jar().req('GET', `/${A3.slug}/galeri`)).status, 200);
+    await setAtt({ galleryAccess: 'contributors' });
+    assert.strictEqual((await new Jar().req('GET', `/${A3.slug}/galeri`)).status, 403);
+  });
+
+  await test('tamu terdaftar berswafoto lewat ?to= → fotonya tercatat atas namanya, tombol galeri muncul di undangannya', async () => {
+    const g = new Jar(); const ani = A3.g[0];
+    const before = await g.req('GET', `/${A3.slug}?to=${ani.code}`);
+    assert.ok(before.data.includes('id="ticket"') && before.data.includes('<svg'), 'tiket QR tampil untuk tamu');
+    assert.ok(before.data.includes(`/${A3.slug}/foto?to=${ani.code}`), 'tombol bagikan foto');
+    assert.ok(!before.data.includes(`/${A3.slug}/galeri?to=`), 'belum ikut unggah → belum ada tombol galeri');
+    assert.ok(before.data.includes('✓ Sudah tercatat') || before.data.includes('Sudah tercatat'), 'status buku tamu terlihat');
+    const up = await g.req('POST', `/api/public/${A3.slug}/selfie`, photoForm([png(5)], { to: ani.code }));
+    assert.strictEqual(up.status, 201); assert.strictEqual(up.data.name, 'Ani Presensi');
+    const after = await g.req('GET', `/${A3.slug}?to=${ani.code}`);
+    assert.ok(after.data.includes(`/${A3.slug}/galeri?to=${ani.code}`), 'tombol galeri muncul setelah ikut mendokumentasikan');
+    const fresh = new Jar(); // perangkat lain, hanya punya link pribadi
+    assert.ok((await fresh.req('GET', `/${A3.slug}?to=${ani.code}`)).data.includes(`/${A3.slug}/galeri?to=${ani.code}`), 'tombol mengikuti tamu, bukan perangkat');
+    assert.strictEqual((await fresh.req('GET', `/${A3.slug}/galeri?to=${ani.code}`)).status, 200);
+    const anonPage = await anon.req('GET', `/${A3.slug}`);
+    assert.ok(!anonPage.data.includes('id="ticket"'), 'link umum tidak punya tiket');
+    const page = await g.req('GET', `/${A3.slug}/foto?to=${ani.code}`);
+    assert.ok(page.data.includes('Halo,') && !page.data.includes('id="uname"'), 'tamu dikenali, tak perlu mengetik nama');
+    A3.aniJar = g;
+  });
+
+  await test('QR tamu bisa diunduh (SVG) hanya dengan kode valid; QR acara hanya untuk pemilik', async () => {
+    const ani = A3.g[0];
+    const q = await anon.req('GET', `/${A3.slug}/tiket.svg?to=${ani.code}`);
+    assert.strictEqual(q.status, 200); assert.ok(q.data.startsWith('<svg')); assert.ok(q.headers.get('content-disposition').includes('attachment'));
+    assert.strictEqual((await anon.req('GET', `/${A3.slug}/tiket.svg?to=zzzzzzzz`)).status, 404);
+    assert.strictEqual((await anon.req('GET', `/${A3.slug}/tiket.svg`)).status, 404);
+    assert.strictEqual((await owner.req('GET', `/api/invitations/${A3.id}/event-qr.svg`)).status, 200);
+    assert.strictEqual((await anon.req('GET', `/api/invitations/${A3.id}/event-qr.svg`)).status, 401);
+    assert.strictEqual((await other.req('GET', `/api/invitations/${A3.id}/event-qr.svg`)).status, 404);
+  });
+
+  await test('galeri photobooth: unggah petugas/mesin per tamu; tamu hanya melihat fotonya, semua bila dibagikan', async () => {
+    const [ani, budi, cici] = A3.g;
+    let r = await anon.req('POST', `/api/scan/${A3.token}/photos`, photoForm([png(7), png(8)], { guestId: String(ani.id) }));
+    assert.strictEqual(r.status, 201); assert.strictEqual(r.data.saved, 2); assert.strictEqual(r.data.guest.name, 'Ani Presensi');
+    r = await anon.req('POST', `/api/scan/${A3.token}/photos`, photoForm([png(9)], { code: `http://x/${A3.slug}?to=${budi.code}` }));
+    assert.strictEqual(r.status, 201); assert.strictEqual(r.data.guest.name, 'Budi Presensi');
+    assert.strictEqual((await anon.req('POST', `/api/scan/${A3.token}/photos`, photoForm([png(9)], { guestId: '999999999' }))).status, 404);
+    assert.strictEqual((await anon.req('POST', `/api/scan/${A3.token}/photos`, photoForm([Buffer.from('bukan foto sama sekali, teks biasa')]))).status, 400);
+    assert.strictEqual((await anon.req('POST', `/api/scan/${A3.token}/photos`, photoForm([png(11)]))).status, 201, 'boleh tanpa tamu');
+    const ownerList = await owner.req('GET', `/api/invitations/${A3.id}/photos?kind=booth`);
+    assert.strictEqual(ownerList.data.total, 4);
+    const aniPhoto = ownerList.data.photos.find((p) => p.guest_id === ani.id).id;
+    const budiPhoto = ownerList.data.photos.find((p) => p.guest_id === budi.id).id;
+    // tamu (lewat ?to=) hanya melihat miliknya
+    const j = new Jar();
+    const pg = await j.req('GET', `/${A3.slug}/photobooth?to=${ani.code}`);
+    assert.strictEqual(pg.status, 200); assert.ok(pg.data.includes('Foto Photobooth Saya') && pg.data.includes('2 foto'));
+    assert.strictEqual((await j.req('GET', `/${A3.slug}/media/${aniPhoto}?to=${ani.code}`)).status, 200);
+    assert.strictEqual((await j.req('GET', `/${A3.slug}/media/${budiPhoto}?to=${ani.code}`)).status, 403, 'foto tamu lain tertutup');
+    assert.strictEqual((await j.req('GET', `/${A3.slug}/media/${aniPhoto}`)).status, 403, 'tanpa kode tamu → tertutup');
+    assert.strictEqual((await j.req('GET', `/${A3.slug}/photobooth`)).status, 403);
+    assert.strictEqual((await j.req('GET', `/${A3.slug}/photobooth?to=${cici.code}`)).data.includes('belum tersedia'), true);
+    // tombol photobooth hanya untuk yang punya foto
+    assert.ok((await j.req('GET', `/${A3.slug}?to=${ani.code}`)).data.includes(`/${A3.slug}/photobooth?to=${ani.code}`));
+    assert.ok(!(await j.req('GET', `/${A3.slug}?to=${cici.code}`)).data.includes(`/${A3.slug}/photobooth?to=`));
+    // dibagikan ke semua tamu
+    await setAtt({ boothShare: 'all' });
+    assert.strictEqual((await j.req('GET', `/${A3.slug}/media/${budiPhoto}?to=${ani.code}`)).status, 200);
+    assert.ok((await j.req('GET', `/${A3.slug}/photobooth?to=${ani.code}`)).data.includes('4 foto'));
+    assert.strictEqual((await new Jar().req('GET', `/${A3.slug}/media/${budiPhoto}`)).status, 403, 'anonim tetap tidak bisa');
+    await setAtt({ boothShare: 'own' });
+    // photobooth dimatikan → galeri tertutup untuk tamu, tetap terbuka untuk pemilik
+    await setAtt({ photobooth: false });
+    assert.strictEqual((await j.req('GET', `/${A3.slug}/photobooth?to=${ani.code}`)).status, 404);
+    assert.strictEqual((await owner.req('GET', `/${A3.slug}/photobooth`)).status, 200);
+    assert.strictEqual((await anon.req('POST', `/api/scan/${A3.token}/photos`, photoForm([png()]))).status, 403);
+    await setAtt({ photobooth: true });
+    A3.boothIds = { aniPhoto, budiPhoto };
+  });
+
+  await test('pemilik: daftar, unduh zip, hapus foto (file ikut terhapus), terisolasi antar akun', async () => {
+    const list = await owner.req('GET', `/api/invitations/${A3.id}/photos?kind=selfie`);
+    assert.strictEqual(list.data.total, 3);
+    const z = await ownerBin.req('GET', `/api/invitations/${A3.id}/photos.zip?kind=selfie`);
+    assert.strictEqual(z.status, 200); assert.strictEqual(z.headers.get('content-type'), 'application/zip'); assert.strictEqual(z.data.subarray(0, 2).toString(), 'PK');
+    const JSZip = require('jszip'); const zz = await JSZip.loadAsync(z.data); assert.strictEqual(Object.keys(zz.files).length, 3);
+    assert.strictEqual((await other.req('GET', `/api/invitations/${A3.id}/photos`)).status, 404);
+    assert.strictEqual((await other.req('GET', `/api/invitations/${A3.id}/photos.zip`)).status, 404);
+    assert.strictEqual((await other.req('DELETE', `/api/invitations/${A3.id}/photos/${list.data.photos[0].id}`)).status, 404);
+    assert.strictEqual((await anon.req('GET', `/api/invitations/${A3.id}/photos`)).status, 401);
+    const gone = await pool.query('SELECT file FROM photos WHERE id = $1', [list.data.photos[0].id]);
+    const fp = path.join(__dirname, '../storage/gallery', String(A3.id), gone.rows[0].file);
+    assert.ok(fs.existsSync(fp));
+    assert.strictEqual((await owner.req('DELETE', `/api/invitations/${A3.id}/photos/${list.data.photos[0].id}`)).status, 200);
+    assert.ok(!fs.existsSync(fp), 'file fisik ikut terhapus');
+    assert.strictEqual((await owner.req('GET', `/${A3.slug}/media/${list.data.photos[0].id}`)).status, 404);
+    const b = await owner.req('POST', `/api/invitations/${A3.id}/photos/bulk-delete`, { ids: [A3.boothIds.aniPhoto, 'x', '1;DROP'] });
+    assert.strictEqual(b.data.affected, 1);
+    // unggah dari editor (fotografer) untuk tamu tertentu
+    const up = await owner.req('POST', `/api/invitations/${A3.id}/photos`, photoForm([png(3), png(4)], { guest_id: String(A3.g[2].id) }));
+    assert.strictEqual(up.status, 201); assert.strictEqual(up.data.saved, 2);
+    assert.strictEqual((await owner.req('POST', `/api/invitations/${A3.id}/photos`, photoForm([Buffer.from('teks biasa panjang cukup')]))).status, 400);
+  });
+
+  await test('halaman cetak (kartu QR semua tamu & poster QR acara) hanya untuk pemilik; editor memuat kunci petugas', async () => {
+    const c = await owner.req('GET', `/print/${A3.id}/cards`);
+    assert.strictEqual(c.status, 200); assert.strictEqual((c.data.match(/<article class="card">/g) || []).length, 4); assert.ok(c.data.includes('Ani Presensi'));
+    const po = await owner.req('GET', `/print/${A3.id}/poster`);
+    assert.strictEqual(po.status, 200); assert.ok(po.data.includes(`/${A3.slug}/foto`));
+    assert.strictEqual((await anon.req('GET', `/print/${A3.id}/cards`)).status, 302);
+    assert.strictEqual((await other.req('GET', `/print/${A3.id}/cards`)).status, 404);
+    assert.strictEqual((await other.req('GET', `/print/${A3.id}/poster`)).status, 404);
+    const ed = await owner.req('GET', `/editor/${A3.id}?main_menu=guest&form=attend`);
+    assert.ok(ed.data.includes(A3.token));
+    assert.ok(!(await anon.req('GET', `/${A3.slug}?to=${A3.g[0].code}`)).data.includes(A3.token), 'kunci petugas tidak bocor di halaman publik');
+    assert.ok(!(await anon.req('GET', `/${A3.slug}/foto`)).data.includes(A3.token));
+  });
+
+  await test('ekspor Excel memuat waktu check-in & photobooth; impor ulang tetap memperbarui (tidak menggandakan)', async () => {
+    const x = await ownerBin.req('GET', `/api/invitations/${A3.id}/export/guests.xlsx`);
+    assert.strictEqual(x.status, 200);
+    const wb = new ExcelJS.Workbook(); await wb.xlsx.load(x.data);
+    const ws = wb.getWorksheet('Tamu');
+    assert.strictEqual(ws.getRow(1).getCell(11).value, 'Check-in buku tamu'); assert.strictEqual(ws.getRow(1).getCell(12).value, 'Photobooth');
+    const row = ws.getRow(2); assert.ok(row.getCell(11).value, 'waktu check-in terisi'); assert.ok(row.getCell(12).value, 'waktu photobooth terisi');
+    const fd = new FormData(); fd.append('file', new Blob([x.data]), 'tamu.xlsx');
+    const im = await owner.req('POST', `/api/invitations/${A3.id}/guests/import`, fd);
+    assert.strictEqual(im.status, 200); assert.strictEqual(im.data.added, 0); assert.strictEqual(im.data.updated, 4);
+  });
+
+  await test('selfie: batas unggahan per tamu & token diganti → tautan petugas lama mati', async () => {
+    const heavy = new Jar();
+    for (let i = 0; i < 10; i += 1) assert.strictEqual((await heavy.req('POST', `/api/public/${A3.slug}/selfie`, photoForm(Array.from({ length: 6 }, (_, k) => png(k)), { name: 'Rajin' }))).status, 201);
+    const over = await heavy.req('POST', `/api/public/${A3.slug}/selfie`, photoForm([png()], { name: 'Rajin' }));
+    assert.strictEqual(over.status, 400, 'lebih dari 60 foto per tamu ditolak'); assert.ok(/Maksimal 60/.test(over.data.error));
+    const n = await owner.req('POST', `/api/invitations/${A3.id}/staff-token`);
+    assert.strictEqual(n.status, 200); assert.notStrictEqual(n.data.staff_token, A3.token);
+    assert.strictEqual((await anon.req('GET', `/api/scan/${A3.token}/info`)).status, 404);
+    assert.strictEqual((await anon.req('GET', `/api/scan/${n.data.staff_token}/info`)).status, 200);
+    assert.strictEqual((await other.req('POST', `/api/invitations/${A3.id}/staff-token`)).status, 404);
+    A3.token = n.data.staff_token;
+  });
+
+  await test('hapus undangan menghapus seluruh foto galerinya (DB & disk)', async () => {
+    const dir = path.join(__dirname, '../storage/gallery', String(A3.id));
+    assert.ok(fs.existsSync(dir));
+    assert.strictEqual((await owner.req('DELETE', `/api/invitations/${A3.id}`)).status, 200);
+    await new Promise((r) => setTimeout(r, 300));
+    assert.ok(!fs.existsSync(dir), 'folder galeri terhapus');
+    assert.strictEqual((await pool.query('SELECT count(*)::int AS n FROM photos WHERE invitation_id = $1', [A3.id])).rows[0].n, 0);
+    assert.strictEqual((await pool.query('SELECT count(*)::int AS n FROM scan_log WHERE invitation_id = $1', [A3.id])).rows[0].n, 0);
   });
 
   console.log(results.join('\n'));

@@ -176,7 +176,7 @@ function addGuestValidations(ws, versions, lastRow) {
   }
 }
 
-const GUEST_COLS = [['Nama', 30], ['Grup', 18], ['Telepon / WhatsApp', 20], ['Jumlah', 10], ['Jenis', 12], ['Versi', 16], ['Meja', 12], ['Kode (jangan diubah)', 18], ['Link undangan', 48], ['Status', 14]];
+const GUEST_COLS = [['Nama', 30], ['Grup', 18], ['Telepon / WhatsApp', 20], ['Jumlah', 10], ['Jenis', 12], ['Versi', 16], ['Meja', 12], ['Kode (jangan diubah)', 18], ['Link undangan', 48], ['Status', 14], ['Check-in buku tamu', 20], ['Photobooth', 20]];
 
 function guestGuide(versions) {
   return [
@@ -187,7 +187,7 @@ function guestGuide(versions) {
     'Jenis: pilih Individu, Grup, atau Privat dari daftar.',
     `Versi: pilih versi undangan untuk tamu ini (${[DEFAULT_NAME].concat(versions.map((v) => v.name)).join(', ')}). Kosong = ${DEFAULT_NAME}. Versi dibuat di menu "Versi undangan" pada editor.`,
     'Kode & Link: dibuat otomatis oleh sistem. Biarkan kolom Kode apa adanya jika Anda mengimpor ulang berkas hasil ekspor — tamu dengan kode yang sama akan DIPERBARUI, bukan dobel.',
-    'Status: hanya informasi dari sistem, diabaikan saat impor.',
+    'Status, Check-in buku tamu, Photobooth: hanya informasi dari sistem, diabaikan saat impor.',
     'Simpan sebagai .xlsx lalu unggah lewat tombol "Impor Excel". Maksimal 1000 baris dan 2 MB per impor.',
   ];
 }
@@ -207,7 +207,12 @@ async function buildGuestsWorkbook({ guests, versions, baseUrl, slug, withData =
       else if (g.attendance) status = STATUS_LABEL[g.attendance];
       else if (g.opened_at) status = 'Dibuka';
       const row = ws.addRow([g.name, g.group_name, g.phone, g.pax_limit, KIND_TO_LABEL[g.kind] || 'Individu',
-        vname.get(g.version_id) || DEFAULT_NAME, g.table_name, g.code, `${baseUrl}/${slug}?to=${g.code}`, status]);
+        vname.get(g.version_id) || DEFAULT_NAME, g.table_name, g.code, `${baseUrl}/${slug}?to=${g.code}`, status,
+        g.checked_in_at || '', g.booth_at || '']);
+      row.getCell(11).numFmt = 'yyyy-mm-dd hh:mm';
+      row.getCell(12).numFmt = 'yyyy-mm-dd hh:mm';
+      row.getCell(11).font = { color: { argb: 'FF888888' } };
+      row.getCell(12).font = { color: { argb: 'FF888888' } };
       row.getCell(3).numFmt = '@';
       row.getCell(8).font = { color: { argb: 'FF888888' } };
       row.getCell(9).font = { color: { argb: 'FF888888' } };
@@ -218,7 +223,7 @@ async function buildGuestsWorkbook({ guests, versions, baseUrl, slug, withData =
       ['Ani Lestari', 'Rekan kerja', '', 1, 'Individu', DEFAULT_NAME, ''],
       ['Keluarga Hartono', 'Keluarga', '', 4, 'Grup', DEFAULT_NAME, 'Meja 2']].forEach((r) => ws.addRow(r).getCell(3).numFmt = '@');
   }
-  ws.autoFilter = { from: 'A1', to: 'J1' };
+  ws.autoFilter = { from: 'A1', to: 'L1' };
   addGuestValidations(ws, versions, Math.max(guests.length, 3) + 300);
   guideSheet(wb, guestGuide(versions));
   return toBuffer(wb);

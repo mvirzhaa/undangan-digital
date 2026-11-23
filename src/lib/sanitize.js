@@ -1,6 +1,7 @@
 // Validasi & pembersihan semua data yang dikirim dari editor sebelum disimpan.
 // Tujuan: hanya struktur yang dikenal yang tersimpan, dan URL hanya http(s)/upload lokal.
 const { THEME_KEYS, FONTS, OPENER_KEYS, FX_KEYS } = require('./themes');
+const { attendanceCfg } = require('./attcfg');
 
 const str = (v, max = 300) => (typeof v === 'string' ? v.replace(/\u0000/g, '').slice(0, max) : '');
 const bool = (v) => v === true;
@@ -121,6 +122,7 @@ function cleanSettings(input) {
     musicAutoplay: s.musicAutoplay !== false,
     wishesModerated: bool(s.wishesModerated),
     waTemplate: str(s.waTemplate, 600),
+    attendance: attendanceCfg({ attendance: s.attendance }),
     opener: s.opener === 'none' || OPENER_KEYS.includes(s.opener) ? s.opener : '',
     fx: s.fx === 'none' || FX_KEYS.includes(s.fx) ? s.fx : '',
     sections: {
@@ -149,7 +151,7 @@ function cleanFonts(input, fallback) {
 }
 
 const RESERVED_SLUGS = new Set([
-  'api', 'admin', 'login', 'register', 'logout', 'dashboard', 'editor', 'preview', 'checkin',
+  'api', 'admin', 'login', 'scan', 'print', 'foto', 'galeri', 'photobooth', 'media', 'tiket', 'register', 'logout', 'dashboard', 'editor', 'preview', 'checkin',
   'css', 'js', 'uploads', 'i', 'static', 'public', 'favicon.ico', 'robots.txt', 'health',
 ]);
 

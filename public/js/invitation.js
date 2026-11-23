@@ -11,6 +11,9 @@
   var $ = function (s, r) { return (r || document).querySelector(s); };
   var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
 
+  // Ingat kode tamu di perangkat ini supaya halaman swafoto langsung mengenali tamu.
+  if (data.to && !data.preview) { try { localStorage.setItem('ud_to_' + data.slug, data.to); } catch (_) {} }
+
   var opener = $('#opener');
   var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   // Lama animasi pembuka (ms) sebelum halaman undangan dibuka penuh.

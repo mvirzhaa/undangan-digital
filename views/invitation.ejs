@@ -234,6 +234,30 @@
     </section>
     <% } %>
 
+    <!-- TIKET MASUK (QR pribadi tamu) -->
+    <% if (typeof ticket !== 'undefined' && ticket) { %>
+    <section class="sec ticket" id="ticket">
+      <h2 class="reveal"><%= t.ticketTitle %></h2>
+      <div class="card ticket-card reveal">
+        <p class="muted"><%= t.ticketHint %></p>
+        <div class="ticket-qr" role="img" aria-label="QR <%= ticket.name %>"><%- ticket.svg %></div>
+        <strong class="ticket-name"><%= ticket.name %></strong>
+        <small class="muted ticket-code"><%= ticket.code %></small>
+        <ul class="ticket-status">
+          <li class="<%= ticket.checkedIn ? 'done' : '' %>"><span><%= t.ticketBook %></span><b><%= ticket.checkedIn ? '✓ ' + t.ticketDone : t.ticketNot %></b></li>
+          <% if (ticket.booth) { %><li class="<%= ticket.boothAt ? 'done' : '' %>"><span><%= t.ticketBooth %></span><b><%= ticket.boothAt ? '✓ ' + t.ticketDone : t.ticketNot %></b></li><% } %>
+        </ul>
+        <div class="ticket-actions">
+          <% if (ticket.downloadUrl) { %><a class="btn ghost small" href="<%= ticket.downloadUrl %>" download><%= t.ticketDownload %></a><% } %>
+          <% if (ticket.selfieUrl) { %><a class="btn primary small" href="<%= ticket.selfieUrl %>"><%= t.photoShare %></a><% } %>
+          <% if (ticket.galleryUrl) { %><a class="btn primary small" href="<%= ticket.galleryUrl %>"><%= t.galleryOpen %></a><% } %>
+          <% if (ticket.boothUrl) { %><a class="btn ghost small" href="<%= ticket.boothUrl %>"><%= settings.attendance && settings.attendance.boothShare === 'all' ? t.boothOpenAll : t.boothOpen %></a><% } %>
+        </div>
+        <% if (ticket.sample) { %><p class="muted ticket-sample"><%= t.ticketSample %></p><% } %>
+      </div>
+    </section>
+    <% } %>
+
     <!-- RSVP -->
     <% if (sections.rsvp) { %>
     <section class="sec rsvp" id="rsvp">
@@ -346,6 +370,7 @@
       <% if (c.hosts.length) { %><a href="#hosts"><%= t.nav_hosts %></a><% } %>
       <% if (eventsWithDate.length) { %><a href="#events"><%= t.nav_events %></a><% } %>
       <% if (sections.program) { %><a href="#program"><%= t.nav_program %></a><% } %>
+      <% if (typeof ticket !== 'undefined' && ticket) { %><a href="#ticket"><%= t.nav_ticket %></a><% } %>
       <% if (sections.rsvp) { %><a href="#rsvp"><%= t.nav_rsvp %></a><% } %>
       <% if (sections.wishes) { %><a href="#wishes"><%= t.nav_wishes %></a><% } %>
     </nav>

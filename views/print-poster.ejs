@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <title>Poster QR acara — <%= inv.title %></title>
+  <link rel="stylesheet" href="<%= basePath %>/css/print.css">
+</head>
+<body class="poster-page">
+<div class="bar">
+  <strong>Poster QR acara</strong>
+  <span class="muted">Cetak ukuran A4/A5 dan pasang di meja tamu atau pintu masuk.</span>
+  <button type="button" id="print-btn">Cetak</button>
+</div>
+<main class="poster">
+  <small><%= inv.title %></small>
+  <h1>Abadikan momen ini 📸</h1>
+  <p>Pindai QR, ambil swafoto, dan foto Anda masuk ke galeri kegiatan.</p>
+  <div class="qr big"><%- svg %></div>
+  <code><%= url %></code>
+</main>
+<script src="<%= basePath %>/js/print.js"></script>
+</body>
+</html>
